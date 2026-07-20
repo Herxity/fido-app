@@ -5,7 +5,7 @@ services:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE must be an immutable image reference}
     restart: unless-stopped
     env_file:
-      - /etc/fido/fido.env
+      - ${FIDO_ENV_FILE:-/etc/fido/fido.env}
     expose:
       - "8000"
     networks:

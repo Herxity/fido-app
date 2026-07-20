@@ -40,11 +40,14 @@ cd "${repo}"
   npm audit --omit=dev
   cd ..
   echo "DELIVERY"
+  verification_env=$(mktemp)
+  trap 'rm -f "${verification_env}"' EXIT
   BACKEND_IMAGE="example.invalid/fido@sha256:$(printf 'a%.0s' {1..64})" \
     CADDY_IMAGE="caddy@sha256:$(printf 'b%.0s' {1..64})" \
     FIDO_RELEASE_DIR=/opt/fido/releases/verification \
     ORIGIN_HOSTNAME=127-0-0-1.sslip.io \
     ACME_EMAIL=operations@fido.invalid \
     FIDO_ORIGIN_VERIFY_TOKEN=01234567890123456789012345678901 \
+    FIDO_ENV_FILE="${verification_env}" \
     docker compose -f docker-compose.prod.yml config --quiet
 ) 2>&1 | tee evidence/latest-verification.txt
