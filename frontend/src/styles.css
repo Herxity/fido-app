@@ -23,6 +23,16 @@
   --radius-lg: 16px;
 }
 
+.sandbox-banner {
+  background: #6f2c1f;
+  color: #fffaf0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.5rem 1rem;
+  text-align: center;
+}
+
 * { box-sizing: border-box; }
 html { min-width: 320px; background: var(--exam-cream); }
 body { margin: 0; min-width: 320px; min-height: 100vh; }

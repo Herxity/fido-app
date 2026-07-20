@@ -42,7 +42,8 @@ export function ConfigurationError({ reason }: { reason: string }) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const key = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
   const demo = import.meta.env.VITE_USE_DEMO_DATA === "true";
-  if (import.meta.env.PROD && demo) return <ConfigurationError reason="Demo mode cannot run in a production build." />;
+  const syntheticStaging = import.meta.env.VITE_DEPLOYMENT_STAGE === "staging" && import.meta.env.VITE_DEMO_SANDBOX_ACKNOWLEDGED === "true";
+  if (import.meta.env.PROD && demo && !syntheticStaging) return <ConfigurationError reason="Demo mode requires an explicitly acknowledged synthetic staging build." />;
   if (demo) return <DemoSession>{children}</DemoSession>;
   if (!key) return <ConfigurationError reason="A Clerk publishable key is required." />;
   return <ClerkProvider publishableKey={key}><ClerkSession>{children}</ClerkSession></ClerkProvider>;
