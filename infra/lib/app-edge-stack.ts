@@ -57,13 +57,11 @@ export class FidoAppEdgeStack extends Stack {
     });
 
     const userData = Fn.base64(
-      Fn.sub(`#!/usr/bin/env bash
-set -euo pipefail
-install -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
-printf '%s\\n' '${sshPublicKey.valueAsString}' > /home/ubuntu/.ssh/authorized_keys
-chown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys
-chmod 600 /home/ubuntu/.ssh/authorized_keys
-`),
+      Fn.join("", [
+        "#!/usr/bin/env bash\nset -euo pipefail\ninstall -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh\nprintf '%s\\n' '",
+        sshPublicKey.valueAsString,
+        "' > /home/ubuntu/.ssh/authorized_keys\nchown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys\nchmod 600 /home/ubuntu/.ssh/authorized_keys\n",
+      ]),
     );
 
     const instance = new lightsail.CfnInstance(this, "ApplicationInstance", {
