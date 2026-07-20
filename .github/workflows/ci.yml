@@ -84,6 +84,7 @@ jobs:
           context: backend
           file: backend/Dockerfile
           push: false
+          load: true
           tags: fido-backend:ci
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
