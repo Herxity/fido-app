@@ -1,0 +1,79 @@
+name: fido
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE must be an immutable image reference}
+    restart: unless-stopped
+    env_file:
+      - /etc/fido/fido.env
+    expose:
+      - "8000"
+    networks:
+      - app
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=5)
+      interval: 15s
+      timeout: 6s
+      retries: 4
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  caddy:
+    image: ${CADDY_IMAGE:?CADDY_IMAGE must be an immutable image reference}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+      FIDO_ORIGIN_VERIFY_TOKEN: ${FIDO_ORIGIN_VERIFY_TOKEN:?FIDO_ORIGIN_VERIFY_TOKEN is required}
+      ORIGIN_HOSTNAME: ${ORIGIN_HOSTNAME:?ORIGIN_HOSTNAME is required}
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - edge
+      - app
+    volumes:
+      - ${FIDO_RELEASE_DIR:?FIDO_RELEASE_DIR is required}/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${FIDO_RELEASE_DIR:?FIDO_RELEASE_DIR is required}/frontend:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+networks:
+  edge: {}
+  app:
+    internal: true
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

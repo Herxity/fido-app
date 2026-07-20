@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AssumeCdkBootstrapRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::286533052478:role/cdk-hnb659fds-*"
+    },
+    {
+      "Sid": "ReadCdkBootstrapVersion",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:us-east-1:286533052478:parameter/cdk-bootstrap/hnb659fds/version"
+    },
+    {
+      "Sid": "InspectFidoStacks",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:GetTemplate",
+        "cloudformation:GetTemplateSummary",
+        "cloudformation:ListStackResources"
+      ],
+      "Resource": "arn:aws:cloudformation:us-east-1:286533052478:stack/fido-*/*"
+    },
+    {
+      "Sid": "ListStacks",
+      "Effect": "Allow",
+      "Action": "cloudformation:ListStacks",
+      "Resource": "*"
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+name: Deploy staging infrastructure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: infra/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CDK_ROLE_ARN }}
+          aws-region: us-east-1
+      - working-directory: infra
+        run: npm ci
+      - name: Strict synth and change review
+        working-directory: infra
+        env:
+          SSH_ALLOWED_CIDR: ${{ vars.SSH_ALLOWED_CIDR }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+          ORIGIN_VERIFY_TOKEN: ${{ secrets.ORIGIN_VERIFY_TOKEN }}
+        run: |
+          npm run synth
+          npx cdk diff --all --strict --context stage=staging \
+            --parameters FidoAppEdgeStack:SshAllowedCidr="$SSH_ALLOWED_CIDR" \
+            --parameters FidoAppEdgeStack:SshPublicKey="$SSH_PUBLIC_KEY" \
+            --parameters FidoAppEdgeStack:OriginVerifyToken="$ORIGIN_VERIFY_TOKEN"
+      - name: Deploy protected database then replaceable application edge
+        working-directory: infra
+        env:
+          SSH_ALLOWED_CIDR: ${{ vars.SSH_ALLOWED_CIDR }}
+          SSH_PUBLIC_KEY: ${{ vars.SSH_PUBLIC_KEY }}
+          ORIGIN_VERIFY_TOKEN: ${{ secrets.ORIGIN_VERIFY_TOKEN }}
+        run: |
+          npx cdk deploy FidoStatefulStack --strict --require-approval never --context stage=staging
+          npx cdk deploy FidoAppEdgeStack --strict --require-approval never --context stage=staging \
+            --parameters SshAllowedCidr="$SSH_ALLOWED_CIDR" \
+            --parameters SshPublicKey="$SSH_PUBLIC_KEY" \
+            --parameters OriginVerifyToken="$ORIGIN_VERIFY_TOKEN" \
+            --outputs-file ../evidence/staging-stack-outputs.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: staging-stack-outputs-${{ github.sha }}
+          path: evidence/staging-stack-outputs.json
+          retention-days: 30

@@ -1,0 +1,34 @@
+{
+	admin off
+	email {$ACME_EMAIL}
+}
+
+{$ORIGIN_HOSTNAME} {
+	@untrusted not header X-Fido-Origin-Verify {$FIDO_ORIGIN_VERIFY_TOKEN}
+	respond @untrusted "Forbidden" 403
+
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

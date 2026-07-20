@@ -1,0 +1,113 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend-image: ${{ steps.image-ref.outputs.value }}
+      frontend-sha256: ${{ steps.frontend.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: image-name
+        shell: bash
+        run: echo "value=ghcr.io/${GITHUB_REPOSITORY,,}-backend" >>"$GITHUB_OUTPUT"
+      - id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ steps.image-name.outputs.value }}:${{ github.sha }}
+      - id: image-ref
+        shell: bash
+        run: echo "value=${{ steps.image-name.outputs.value }}@${{ steps.backend.outputs.digest }}" >>"$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_PERSONA_TEMPLATE_ID: ${{ vars.VITE_PERSONA_TEMPLATE_ID }}
+          VITE_USE_DEMO_DATA: "false"
+        run: npm ci && npm run build
+      - id: frontend
+        shell: bash
+        run: |
+          tar -C frontend/dist -czf frontend-${GITHUB_SHA}.tgz .
+          echo "sha256=$(sha256sum frontend-${GITHUB_SHA}.tgz | cut -d' ' -f1)" >>"$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-${{ github.sha }}
+          path: frontend-${{ github.sha }}.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-${{ github.sha }}
+      - name: Verify frontend artifact
+        shell: bash
+        env:
+          EXPECTED_SHA256: ${{ needs.build.outputs.frontend-sha256 }}
+        run: echo "${EXPECTED_SHA256}  frontend-${GITHUB_SHA}.tgz" | sha256sum --check --strict
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: host
+        shell: bash
+        run: |
+          host=$(aws cloudformation describe-stacks --stack-name fido-app-edge-production --query "Stacks[0].Outputs[?OutputKey=='StaticIpAddress'].OutputValue" --output text)
+          test -n "$host" && test "$host" != None
+          echo "value=$host" >>"$GITHUB_OUTPUT"
+      - name: Install pinned SSH identity
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Transfer and activate release
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ steps.host.outputs.value }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          BACKEND_IMAGE: ${{ needs.build.outputs.backend-image }}
+        run: |
+          remote_dir=/tmp/fido-deploy-${GITHUB_SHA}
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "install -d -m 700 ${remote_dir}"
+          scp frontend-${GITHUB_SHA}.tgz docker-compose.prod.yml deploy/Caddyfile deploy/deploy.sh "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_dir}/"
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "sudo bash ${remote_dir}/deploy.sh --backend-image '${BACKEND_IMAGE}' --release-id '${GITHUB_SHA}' --frontend-archive '${remote_dir}/frontend-${GITHUB_SHA}.tgz' --compose-file '${remote_dir}/docker-compose.prod.yml' --caddyfile '${remote_dir}/Caddyfile'"
+          ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "rm -rf -- ${remote_dir}"

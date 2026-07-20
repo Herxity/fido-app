@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageFidoLightsail",
+      "Effect": "Allow",
+      "Action": ["lightsail:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ManageFidoEdge",
+      "Effect": "Allow",
+      "Action": ["cloudfront:*", "wafv2:*", "cloudwatch:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "OptionalCustomDomain",
+      "Effect": "Allow",
+      "Action": [
+        "acm:DescribeCertificate",
+        "acm:ListCertificates",
+        "route53:ChangeResourceRecordSets",
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadAccountContext",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeAvailabilityZones", "ssm:GetParameter"],
+      "Resource": "*"
+    }
+  ]
+}

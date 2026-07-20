@@ -1,0 +1,9 @@
+{
+  "app": "npx tsx bin/fido.ts",
+  "context": {
+    "@aws-cdk/aws-cloudfront:defaultSecurityPolicyTLSv1.2_2021": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/core:newStyleStackSynthesis": true
+  }
+}
