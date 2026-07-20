@@ -28,7 +28,11 @@
     {
       "Sid": "ReadAccountContext",
       "Effect": "Allow",
-      "Action": ["ec2:DescribeAvailabilityZones", "ssm:GetParameter"],
+      "Action": [
+        "ec2:DescribeAvailabilityZones",
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
       "Resource": "*"
     }
   ]

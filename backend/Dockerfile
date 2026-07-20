@@ -1,10 +1,10 @@
-FROM python:3.12.11-slim AS build
-COPY --from=ghcr.io/astral-sh/uv:0.8.9 /uv /bin/uv
+FROM python:3.12.13-slim AS build
+COPY --from=ghcr.io/astral-sh/uv:0.11.30 /uv /bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
-FROM python:3.12.11-slim
+FROM python:3.12.13-slim
 RUN useradd --system --uid 10001 --home /nonexistent fido
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
