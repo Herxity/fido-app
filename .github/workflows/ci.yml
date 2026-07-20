@@ -85,7 +85,7 @@ jobs:
           file: backend/Dockerfile
           push: false
           tags: fido-backend:ci
-      - uses: aquasecurity/trivy-action@0.32.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: fido-backend:ci
           severity: HIGH,CRITICAL
