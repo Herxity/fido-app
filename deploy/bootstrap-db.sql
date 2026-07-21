@@ -23,8 +23,6 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fido_runtime')
 SELECT format('ALTER ROLE fido_runtime LOGIN PASSWORD %L', :'runtime_password')
 \gexec
 
-ALTER ROLE fido_migrator NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
-ALTER ROLE fido_runtime NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
 SELECT format('GRANT fido_migrator TO %I', current_user)
 \gexec
 
