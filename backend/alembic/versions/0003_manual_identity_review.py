@@ -1,6 +1,6 @@
 """Add shelter-operated identity review and reconciliation candidates."""
 
-from sqlalchemy import Column, ForeignKey, String, Uuid, inspect
+from sqlalchemy import Column, String, Uuid, inspect
 
 from alembic import op
 from app.models import IdentityMatchCandidate
@@ -15,7 +15,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     columns = {column["name"] for column in inspect(bind).get_columns("identity_inquiries")}
     additions = (
-        Column("reviewing_shelter_id", Uuid, ForeignKey("shelters.id"), nullable=True),
+        Column("reviewing_shelter_id", Uuid, nullable=True),
         Column("submitted_by_user_id", String(200), nullable=True),
         Column("submitted_display_name", String(200), nullable=True),
         Column("match_classification", String(40), nullable=True),
@@ -24,6 +24,21 @@ def upgrade() -> None:
         for column in additions:
             if column.name not in columns:
                 batch.add_column(column)
+    foreign_keys = inspect(bind).get_foreign_keys("identity_inquiries")
+    has_shelter_foreign_key = any(
+        constraint.get("constrained_columns") == ["reviewing_shelter_id"]
+        and constraint.get("referred_table") == "shelters"
+        for constraint in foreign_keys
+    )
+    if not has_shelter_foreign_key:
+        with op.batch_alter_table("identity_inquiries") as batch:
+            batch.create_foreign_key(
+                "fk_identity_inquiries_reviewing_shelter",
+                "shelters",
+                ["reviewing_shelter_id"],
+                ["id"],
+                ondelete="RESTRICT",
+            )
     indexes = {index["name"] for index in inspect(bind).get_indexes("identity_inquiries")}
     if "ix_identity_inquiries_reviewing_shelter_id" not in indexes:
         op.create_index(
