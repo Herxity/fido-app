@@ -118,6 +118,8 @@ p { line-height: 1.55; }
 .qr-frame { margin-bottom: 24px; padding: 18px; border: 1px solid var(--border-standard); border-radius: var(--radius-md); background: #fffdf8; }
 .countdown { display: flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
 .privacy-note { padding-top: 16px; border-top: 1px solid var(--border-soft); font-size: .85rem; }
+.local-test-note { display: flex; align-items: center; gap: 10px; width: min(500px, 100%); margin: 4px 0 16px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--exam-inset); color: var(--slate-soft); font-size: .82rem; text-align: left; }
+.local-test-note svg { flex: 0 0 auto; color: var(--id-brass); }
 .notice { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px; }
 .notice p { margin: 3px 0 0; color: var(--slate-soft); font-size: .88rem; }
 .access-list, .registry-list ul { margin: 0; padding: 0; list-style: none; }
@@ -173,6 +175,11 @@ textarea { padding: 12px; resize: vertical; line-height: 1.5; }
 .kennel-card dd { margin: 5px 0 0; font-weight: 650; }
 .card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
 .scan-input { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+.local-lookup-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; padding: 16px; border-radius: var(--radius-md); background: var(--exam-inset); }
+.local-lookup-shortcut > div { display: flex; align-items: center; gap: 12px; }
+.local-lookup-shortcut svg { flex: 0 0 auto; color: var(--id-brass); }
+.local-lookup-shortcut span { display: grid; gap: 3px; }
+.local-lookup-shortcut small { color: var(--slate-soft); }
 .lookup-panel aside { margin-top: 24px; padding: 16px; background: var(--exam-paper); }
 .lookup-panel aside p { margin: 4px 0 0; color: var(--slate-soft); font-size: .84rem; }
 .neutral-callout { display: flex; flex-direction: column; margin: 20px 0 8px; }
@@ -251,6 +258,7 @@ textarea { padding: 12px; resize: vertical; line-height: 1.5; }
   .registry-list { border-right: 0; border-bottom: 1px solid var(--border-soft); }
   .registry-detail { min-height: 360px; }
   .scan-input { grid-template-columns: 1fr; }
+  .local-lookup-shortcut { align-items: stretch; flex-direction: column; }
   .field-grid { grid-template-columns: 1fr; }
   .access-list li { align-items: flex-start; }
   .access-list li > div:last-child { justify-items: start; }
