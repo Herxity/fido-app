@@ -13,7 +13,7 @@ os.environ.update(
     {
         "FIDO_ENVIRONMENT": "test",
         "FIDO_PROVIDER_MODE": "test",
-        "FIDO_DATABASE_URL": "sqlite+aiosqlite:///./.pytest-fido.db",
+        "FIDO_DATABASE_URL": "sqlite+aiosqlite:///:memory:",
         "FIDO_LOOKUP_HASH_KEY": "test-lookup-hash-key-at-least-32-bytes",
         "FIDO_FIELD_ENCRYPTION_KEY": Fernet.generate_key().decode(),
         "FIDO_IDENTITY_HASH_KEY": "identity-test-hmac-key-at-least-32-bytes",

@@ -132,3 +132,32 @@ async def test_ambiguous_match_requires_a_different_employee(client, auth) -> No
     )
     assert same_employee.status_code == 409
     assert second_employee.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_same_document_and_demographics_match_when_address_changes(client, auth) -> None:  # type: ignore[no-untyped-def]
+    await create_shelter()
+    staff = auth("staff", "shelter_staff", "org_identity")
+
+    first_request = await client.post("/api/v1/identity/inquiries", headers=auth("owner-one"))
+    first = await client.post(
+        "/api/v1/identity/manual-verifications",
+        headers=staff,
+        json=payload(first_request.json()["verification_code"]),
+    )
+    assert first.status_code == 201
+    assert first.json()["classification"] == "new_identity"
+
+    second_request = await client.post("/api/v1/identity/inquiries", headers=auth("owner-two"))
+    second = await client.post(
+        "/api/v1/identity/manual-verifications",
+        headers=staff,
+        json=payload(
+            second_request.json()["verification_code"],
+            address_line1="800 New Address Avenue",
+            city="Annapolis",
+            postal_code="21401",
+        ),
+    )
+    assert second.status_code == 201
+    assert second.json()["classification"] == "exact_existing"

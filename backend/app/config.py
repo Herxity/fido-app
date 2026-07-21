@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     identity_hash_key: str = ""
     field_encryption_key: str = ""
     lookup_hash_key: str = ""
+    development_clerk_org_id: str = ""
     webhook_tolerance_seconds: int = 300
     request_body_limit: int = 1_048_576
 

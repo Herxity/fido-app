@@ -4,11 +4,13 @@
 
 Requirements: Python 3.12, `uv`, Node.js 22, npm, Docker with Compose v2, and PostgreSQL 18 for integration checks.
 
-1. Copy `backend/.env.example` to `backend/.env` and keep it untracked.
-2. Run `uv sync --frozen` and `uv run pytest` in `backend/`.
-3. Copy `frontend/.env.example` to `frontend/.env.local`; use demo data only for local development.
-4. Run `npm ci`, `npm test`, and `npm run dev` in `frontend/`.
-5. Run `npm ci`, `npm test`, and `npm run synth` in `infra/`.
+1. Start the isolated local PostgreSQL database with `docker compose -f docker-compose.dev.yml up -d`.
+2. Copy `backend/.env.example` to `backend/.env`, point `FIDO_DATABASE_URL` at the local database, configure the Clerk development instance, and set `FIDO_DEVELOPMENT_CLERK_ORG_ID` to its synthetic shelter organization. Keep the file untracked.
+3. Run `uv sync --frozen`, `uv run alembic upgrade head`, and `uv run python scripts/seed_development.py` in `backend/`, followed by `uv run pytest` and `uv run uvicorn app.main:app --reload`.
+4. Copy `frontend/.env.example` to `frontend/.env.local`, configure the matching Clerk publishable key, and keep `VITE_USE_DEMO_DATA=false`. Browser-side demo data does not exercise reconciliation or persistence.
+5. Run `npm ci`, `npm test`, and `npm run dev` in `frontend/`.
+   Open `http://localhost:5173` (not the numeric loopback address) so Clerk's development browser and authorized-party checks use the canonical local origin.
+6. Run `npm ci`, `npm test`, and `npm run synth` in `infra/`.
 
 ## Required checks
 

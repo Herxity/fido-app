@@ -1,4 +1,4 @@
-import { UserButton } from "@clerk/react";
+import { OrganizationSwitcher, UserButton } from "@clerk/react";
 import { ClipboardList, Fingerprint, HeartHandshake, LogOut, PawPrint, QrCode, ShieldCheck, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -20,9 +20,9 @@ export function AppShell() {
   if (!demo && requestedMode !== viewer.data.mode) return <Navigate to={viewer.data.mode === "shelter" ? "/shelter/queue" : "/owner/history"} replace />;
   const shelter = viewer.data.mode === "shelter";
   const links = shelter ? shelterLinks : ownerLinks;
-  return <div className="app-shell">
+  return <div className={`app-shell${demo ? " has-sandbox" : ""}`}>
     {demo && <div className="sandbox-banner" role="status">Sandbox demo — synthetic data only. Clerk is not active.</div>}
-    <header className="topbar"><NavLink className="wordmark" to={shelter ? "/shelter/queue" : "/owner/history"}><span className="tag-mark">F</span><span>Fido</span></NavLink><div className="context"><span className="mode-label">{shelter ? viewer.data.shelter?.name : "My records"}</span><span>{viewer.data.name || name}</span>{provider === "clerk" ? <UserButton /> : <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={18} /></button>}</div></header>
+    <header className="topbar"><NavLink className="wordmark" to={shelter ? "/shelter/queue" : "/owner/history"}><span className="tag-mark">F</span><span>Fido</span></NavLink><div className="context"><span className="mode-label">{shelter ? viewer.data.shelter?.name : "My records"}</span><span>{viewer.data.name || name}</span>{provider === "clerk" ? <><OrganizationSwitcher afterSelectOrganizationUrl="/shelter/queue" afterLeaveOrganizationUrl="/owner/history" /><UserButton /></> : <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={18} /></button>}</div></header>
     <nav className="primary-nav" aria-label="Primary navigation">{links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
     <main className="workspace" id="main"><Outlet context={{ viewer: viewer.data }} /></main>
     {demo && <footer className="mode-switch">Demo views: <NavLink to={shelter ? "/owner/history" : "/shelter/queue"}>Switch to {shelter ? "owner" : "shelter"} view</NavLink></footer>}

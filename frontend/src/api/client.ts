@@ -36,7 +36,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (response.status === 401) onUnauthorized();
     const fallback: ApiProblem = { type: "about:blank", title: "Request failed", status: response.status, detail: "We could not complete that request. Please try again.", requestId: response.headers.get("x-request-id") || undefined };
     let problem = fallback;
-    try { problem = { ...fallback, ...(await response.json()) }; } catch { /* preserve safe fallback */ }
+    try {
+      const payload = await response.json() as Wire;
+      const rawDetail = payload.detail;
+      const detail = typeof rawDetail === "string" ? rawDetail : Array.isArray(rawDetail) ? rawDetail.map((item) => { const issue = item as Wire; const location = Array.isArray(issue.loc) ? issue.loc.slice(1).join(" → ") : "Field"; return `${location}: ${textValue(issue.msg, "is invalid")}`; }).join("; ") : fallback.detail;
+      problem = { ...fallback, ...payload, detail, title: textValue(payload.title, fallback.title), status: response.status } as ApiProblem;
+    } catch { /* preserve safe fallback */ }
     throw new ApiError(problem);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
@@ -47,12 +52,12 @@ export const api = {
   getHistory: async (): Promise<CursorPage<HistoryEntry>> => demo ? { items: demoHistory } : normalizePage(await request<Wire>("/me/history"), normalizeHistory),
   getAccessLog: async (): Promise<CursorPage<AccessLogEntry>> => { if (demo) return { items: demoAccess }; const raw = await request<Wire>("/me/access-log"); return normalizePage(raw, (entry) => { const shelter = (entry.shelter || {}) as Wire; const accessedAt = textValue(entry.accessed_at); return { id: `${textValue(shelter.id, "unknown")}:${accessedAt}`, shelterName: textValue(shelter.name, "Participating shelter"), staffDisplayName: "Authorized shelter staff", accessedAt }; }); },
   createInquiry: async (): Promise<{ verificationCode: string; expiresAt: string }> => {
-    if (demo) return { verificationCode: "FIDO-DEMO-OWNER-VERIFY-2026", expiresAt: new Date(Date.now() + 86400000).toISOString() };
+    if (demo) throw new Error("Identity verification requires the API-backed local environment");
     const raw = await request<Wire>("/identity/inquiries", { method: "POST" });
     return { verificationCode: textValue(raw.verification_code), expiresAt: textValue(raw.expires_at) };
   },
   submitManualVerification: async (input: ManualVerificationInput): Promise<{ id: string; state: string; classification: string; candidateCount: number }> => {
-    if (demo) return { id: `demo-review-${Date.now()}`, state: "approved", classification: "new_identity", candidateCount: 0 };
+    if (demo) throw new Error("Identity reconciliation requires the API-backed local environment");
     const body = { verification_code: input.verificationCode, full_name: input.fullName, date_of_birth: input.dateOfBirth, address_line1: input.addressLine1, address_line2: input.addressLine2 || null, city: input.city, region: input.region, postal_code: input.postalCode, country: input.country, phone: input.phone || null, government_id_last4: input.governmentIdLast4 || null, document_type: input.documentType, document_number: input.documentNumber, issuing_jurisdiction: input.issuingJurisdiction, document_expiration: input.documentExpiration, physical_document_examined: input.physicalDocumentExamined, likeness_matches: input.likenessMatches, owner_consented: input.ownerConsented };
     const raw = await request<Wire>("/identity/manual-verifications", { method: "POST", body: JSON.stringify(body) });
     return { id: textValue(raw.id), state: textValue(raw.state), classification: textValue(raw.classification), candidateCount: Number(raw.candidate_count || 0) };
@@ -61,7 +66,7 @@ export const api = {
     if (demo) return { items: [] };
     return normalizePage(await request<Wire>("/identity/manual-reviews"), (entry) => ({ id: textValue(entry.id), submittedName: textValue(entry.submitted_name), classification: textValue(entry.classification) as IdentityReview["classification"], createdAt: textValue(entry.created_at), requiresSecondReviewer: Boolean(entry.requires_second_reviewer), candidates: Array.isArray(entry.candidates) ? entry.candidates.map((value) => { const candidate = value as Wire; return { personId: textValue(candidate.person_id), displayName: textValue(candidate.display_name), classification: textValue(candidate.classification) as "exact" | "fuzzy", confidence: Number(candidate.confidence || 0), evidence: Array.isArray(candidate.evidence) ? candidate.evidence.map(String) : [] }; }) : [] }));
   },
-  resolveIdentityReview: async (id: string, decision: "link_existing" | "approve_new" | "decline" | "request_more_information", explanation: string, targetPersonId?: string): Promise<void> => { if (demo) return; await request(`/identity/manual-reviews/${id}/resolve`, { method: "POST", body: JSON.stringify({ decision, target_person_id: targetPersonId || null, explanation }) }); },
+  resolveIdentityReview: async (id: string, decision: "link_existing" | "approve_new" | "decline" | "request_more_information", explanation: string, targetPersonId?: string): Promise<void> => { if (demo) throw new Error("Identity reconciliation requires the API-backed local environment"); await request(`/identity/manual-reviews/${id}/resolve`, { method: "POST", body: JSON.stringify({ decision, target_person_id: targetPersonId || null, explanation }) }); },
   createLookupToken: async (): Promise<LookupTokenResponse> => { if (demo) return { token: "fido_demo_7Q2K9M", expiresAt: new Date(Date.now() + 300000).toISOString() }; const raw = await request<Wire>("/me/lookup-tokens", { method: "POST" }); return { token: textValue(raw.qr_payload) || textValue(raw.token), expiresAt: textValue(raw.expires_at) }; },
   redeemLookup: async (token: string): Promise<LookupSession> => { if (demo) return { id: "lookup-1", personDisplayName: "Maya Carter", expiresAt: new Date(Date.now() + 1800000).toISOString(), history: demoHistory }; const redemption = await request<Wire>("/lookups/redeem", { method: "POST", body: JSON.stringify({ token }) }); const id = textValue(redemption.session_id); const history = await request<Wire>(`/lookups/${id}/history`); const person = (history.person || {}) as Wire; return { id, expiresAt: textValue(redemption.expires_at), personDisplayName: textValue(person.display_name, "Verified owner"), history: normalizePage(history, normalizeHistory).items }; },
   getPets: async (shelterId: string): Promise<CursorPage<PetSummary>> => demo ? { items: demoPets } : normalizePage(await request<Wire>(`/shelters/${shelterId}/pets`), normalizePet),

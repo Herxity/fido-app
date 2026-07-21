@@ -4,7 +4,10 @@ import { beforeEach, test, vi } from "vitest";
 import { api } from "../../api/client";
 import { IdentityDesk } from "./IdentityDesk";
 
-vi.mock("../../api/client", () => ({ api: { getIdentityReviews: vi.fn(), submitManualVerification: vi.fn(), resolveIdentityReview: vi.fn() } }));
+vi.mock("../../api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../api/client")>();
+  return { ...actual, api: { getIdentityReviews: vi.fn(), submitManualVerification: vi.fn(), resolveIdentityReview: vi.fn() } };
+});
 
 beforeEach(() => {
   vi.mocked(api.getIdentityReviews).mockResolvedValue({ items: [] });
@@ -18,6 +21,10 @@ test("presents scanner, editable evidence, physical checks, and review queue", a
   expect(screen.getByRole("button", { name: "Open camera" })).toBeInTheDocument();
   expect(screen.getByLabelText("USB or Bluetooth scanner input")).toBeInTheDocument();
   expect(screen.getByLabelText("Owner verification code")).toBeRequired();
+  expect(screen.getByLabelText("City")).toBeInstanceOf(HTMLSelectElement);
+  expect(screen.getByLabelText("State")).toBeInstanceOf(HTMLSelectElement);
+  expect(screen.getByLabelText("Country")).toBeInstanceOf(HTMLSelectElement);
+  expect(screen.getByLabelText("Issuing jurisdiction")).toBeInstanceOf(HTMLSelectElement);
   expect(screen.getByLabelText(/physical document and its security features/i)).toBeRequired();
   expect(await screen.findByText("No identity matches need review")).toBeInTheDocument();
 });

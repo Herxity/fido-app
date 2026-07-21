@@ -1,0 +1,22 @@
+name: fido-local
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fido
+      POSTGRES_USER: fido
+      POSTGRES_PASSWORD: fido-local-only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - fido_postgres18_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fido -d fido"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  fido_postgres18_data:
