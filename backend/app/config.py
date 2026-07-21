@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://fido@localhost/fido"
     cors_origins: list[str] = Field(default_factory=list)
     clerk_issuer: str = ""
-    clerk_audience: str = "fido-api"
+    clerk_audience: str = ""
     clerk_jwks_url: str = ""
     clerk_authorized_parties: list[str] = Field(default_factory=list)
     clerk_allow_legacy_org_claims: bool = False

@@ -2,12 +2,20 @@ import base64
 import hashlib
 import hmac
 import time
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from fastapi import HTTPException
 
 from app.config import Settings
-from app.security import principal_from_claims, redact, verify_clerk_webhook, verify_signed_payload
+from app.security import (
+    ClerkVerifier,
+    principal_from_claims,
+    redact,
+    verify_clerk_webhook,
+    verify_signed_payload,
+)
 
 
 def test_production_rejects_fake_provider() -> None:
@@ -25,6 +33,46 @@ def test_clerk_v2_claims_and_pending_session() -> None:
     with pytest.raises(HTTPException) as error:
         principal_from_claims({"sub": "u1", "sts": "pending"})
     assert error.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_clerk_default_session_token_does_not_require_custom_audience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(
+        environment="development",
+        provider_mode="live",
+        clerk_issuer="https://fido.clerk.accounts.dev",
+        clerk_jwks_url="https://fido.clerk.accounts.dev/.well-known/jwks.json",
+        clerk_authorized_parties=["http://127.0.0.1:5173"],
+    )
+    verifier = ClerkVerifier(settings)
+    verifier._jwks = {"keys": [{"kid": "key_1"}]}
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr("app.security.jwt.get_unverified_header", lambda _token: {"kid": "key_1"})
+    monkeypatch.setattr(
+        "app.security.jwt.PyJWK.from_dict", lambda _key: SimpleNamespace(key="public-key")
+    )
+
+    def decode(_token: str, _key: str, **kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {
+            "sub": "owner_1",
+            "iss": settings.clerk_issuer,
+            "exp": int(time.time()) + 60,
+            "iat": int(time.time()),
+            "azp": "http://127.0.0.1:5173",
+        }
+
+    monkeypatch.setattr("app.security.jwt.decode", decode)
+
+    principal = await verifier.verify("signed-token")
+
+    assert principal.user_id == "owner_1"
+    assert captured["audience"] is None
+    assert captured["options"]["verify_aud"] is False
+    assert "aud" not in captured["options"]["require"]
 
 
 def test_persona_rotated_signature_and_staleness() -> None:

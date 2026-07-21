@@ -15,6 +15,7 @@ import httpx
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt.types import Options
 
 from .config import Settings, get_settings
 
@@ -58,13 +59,17 @@ class ClerkVerifier:
                     self._jwks = response.json()
             key_data = next(k for k in self._jwks["keys"] if k["kid"] == header["kid"])
             key = jwt.PyJWK.from_dict(key_data).key
+            required_claims = ["exp", "iat", "sub", "iss"]
+            decode_options: Options = {"require": required_claims}
+            if not self.settings.clerk_audience:
+                decode_options["verify_aud"] = False
             claims = jwt.decode(
                 token,
                 key,
                 algorithms=["RS256"],
-                audience=self.settings.clerk_audience,
+                audience=self.settings.clerk_audience or None,
                 issuer=self.settings.clerk_issuer,
-                options={"require": ["exp", "iat", "sub", "iss", "aud"]},
+                options=decode_options,
             )
             azp = claims.get("azp")
             if (
