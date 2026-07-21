@@ -107,7 +107,7 @@ jobs:
         run: |
           remote_dir=/tmp/fido-deploy-${GITHUB_SHA}
           ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "install -d -m 700 ${remote_dir}"
-          scp frontend-${GITHUB_SHA}.tgz docker-compose.prod.yml deploy/Caddyfile deploy/deploy.sh "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_dir}/"
+          scp frontend-${GITHUB_SHA}.tgz docker-compose.prod.yml deploy/Caddyfile deploy/deploy.sh deploy/run-retention.sh deploy/fido-retention.service deploy/fido-retention.timer "${DEPLOY_USER}@${DEPLOY_HOST}:${remote_dir}/"
           ssh "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "sudo bash ${remote_dir}/deploy.sh --backend-image '${BACKEND_IMAGE}' --release-id '${GITHUB_SHA}' --frontend-archive '${remote_dir}/frontend-${GITHUB_SHA}.tgz' --compose-file '${remote_dir}/docker-compose.prod.yml' --caddyfile '${remote_dir}/Caddyfile'"
           ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "rm -rf -- ${remote_dir}"

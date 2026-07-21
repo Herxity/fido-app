@@ -68,6 +68,15 @@ tar -xzf "${FRONTEND_ARCHIVE}" -C "${release_dir}/frontend"
 install -m 0644 "${COMPOSE_SOURCE}" "${release_dir}/docker-compose.prod.yml"
 install -m 0644 "${CADDY_SOURCE}" "${release_dir}/deploy/Caddyfile"
 
+deploy_source_dir=$(dirname "${CADDY_SOURCE}")
+if [[ -f ${deploy_source_dir}/run-retention.sh && -f ${deploy_source_dir}/fido-retention.service && -f ${deploy_source_dir}/fido-retention.timer ]]; then
+  install -m 0750 "${deploy_source_dir}/run-retention.sh" /usr/local/sbin/fido-retention
+  install -m 0644 "${deploy_source_dir}/fido-retention.service" /etc/systemd/system/fido-retention.service
+  install -m 0644 "${deploy_source_dir}/fido-retention.timer" /etc/systemd/system/fido-retention.timer
+  systemctl daemon-reload
+  systemctl enable --now fido-retention.timer
+fi
+
 previous_image=
 previous_dir=
 if [[ -f ${STATE_FILE} ]]; then
