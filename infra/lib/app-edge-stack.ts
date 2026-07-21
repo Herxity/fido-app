@@ -56,13 +56,11 @@ export class FidoAppEdgeStack extends Stack {
         "Random value also installed in the origin proxy configuration.",
     });
 
-    const userData = Fn.base64(
-      Fn.join("", [
-        "#!/usr/bin/env bash\nset -euo pipefail\ninstall -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh\nprintf '%s\\n' '",
-        sshPublicKey.valueAsString,
-        "' > /home/ubuntu/.ssh/authorized_keys\nchown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys\nchmod 600 /home/ubuntu/.ssh/authorized_keys\n",
-      ]),
-    );
+    const userData = Fn.join("", [
+      "#!/usr/bin/env bash\nset -euo pipefail\ninstall -d -m 700 -o ubuntu -g ubuntu /home/ubuntu/.ssh\nprintf '%s\\n' '",
+      sshPublicKey.valueAsString,
+      "' > /home/ubuntu/.ssh/authorized_keys\nchown ubuntu:ubuntu /home/ubuntu/.ssh/authorized_keys\nchmod 600 /home/ubuntu/.ssh/authorized_keys\n",
+    ]);
 
     const instance = new lightsail.CfnInstance(this, "ApplicationInstance", {
       instanceName: resourcePrefix,

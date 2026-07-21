@@ -66,7 +66,9 @@ describe("FidoAppEdgeStack", () => {
     const instances = template.findResources("AWS::Lightsail::Instance");
     const synthesizedInstance = Object.values(instances)[0];
     if (!synthesizedInstance) throw new Error("expected a Lightsail instance");
-    expect(JSON.stringify(synthesizedInstance)).not.toContain('"Fn::Sub"');
+    expect(JSON.stringify(synthesizedInstance)).not.toMatch(
+      /"Fn::(?:Sub|Base64)"/,
+    );
   });
 
   it("only blocks WAF matches after block mode is explicitly enabled", () => {
