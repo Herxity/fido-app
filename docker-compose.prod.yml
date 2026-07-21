@@ -41,7 +41,6 @@ services:
       backend:
         condition: service_healthy
     environment:
-      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
       FIDO_ORIGIN_VERIFY_TOKEN: ${FIDO_ORIGIN_VERIFY_TOKEN:?FIDO_ORIGIN_VERIFY_TOKEN is required}
       ORIGIN_HOSTNAME: ${ORIGIN_HOSTNAME:?ORIGIN_HOSTNAME is required}
     ports:

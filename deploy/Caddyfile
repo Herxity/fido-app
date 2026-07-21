@@ -1,6 +1,5 @@
 {
 	admin off
-	email {$ACME_EMAIL}
 }
 
 {$ORIGIN_HOSTNAME} {

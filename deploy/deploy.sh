@@ -52,7 +52,6 @@ read_env() {
 CADDY_IMAGE=$(read_env CADDY_IMAGE)
 read_env ORIGIN_HOSTNAME >/dev/null
 read_env FIDO_ORIGIN_VERIFY_TOKEN >/dev/null
-read_env ACME_EMAIL >/dev/null
 [[ ${CADDY_IMAGE} =~ @sha256:[a-f0-9]{64}$ ]] || {
   echo "Caddy image must be pinned by sha256 digest" >&2
   exit 1

@@ -56,7 +56,6 @@ install -d -m 0700 /etc/fido
 cat >/etc/fido/fido.env <<EOF
 CADDY_IMAGE=caddy@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 ORIGIN_HOSTNAME=${origin_host}
-ACME_EMAIL=operations@fido.invalid
 FIDO_ORIGIN_VERIFY_TOKEN=$(<"${secret_dir}/fido-origin-token")
 FIDO_ENVIRONMENT=production
 FIDO_PROVIDER_MODE=live

@@ -46,7 +46,6 @@ cd "${repo}"
     CADDY_IMAGE="caddy@sha256:$(printf 'b%.0s' {1..64})" \
     FIDO_RELEASE_DIR=/opt/fido/releases/verification \
     ORIGIN_HOSTNAME=127-0-0-1.sslip.io \
-    ACME_EMAIL=operations@fido.invalid \
     FIDO_ORIGIN_VERIFY_TOKEN=01234567890123456789012345678901 \
     FIDO_ENV_FILE="${verification_env}" \
     docker compose -f docker-compose.prod.yml config --quiet
