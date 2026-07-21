@@ -15,8 +15,7 @@ test("presents scanner, editable evidence, physical checks, and review queue", a
   render(<QueryClientProvider client={client}><IdentityDesk /></QueryClientProvider>);
 
   expect(screen.getByRole("heading", { name: "Verify an owner in person" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Live scan" })).toBeInTheDocument();
-  expect(screen.getByText("Take barcode photo")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Open camera" })).toBeInTheDocument();
   expect(screen.getByLabelText("USB or Bluetooth scanner input")).toBeInTheDocument();
   expect(screen.getByLabelText("Owner verification code")).toBeRequired();
   expect(screen.getByLabelText(/physical document and its security features/i)).toBeRequired();
