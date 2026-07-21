@@ -12,6 +12,19 @@ Requirements: Python 3.12, `uv`, Node.js 22, npm, Docker with Compose v2, and Po
    Open `http://localhost:5173` (not the numeric loopback address) so Clerk's development browser and authorized-party checks use the canonical local origin.
 6. Run `npm ci`, `npm test`, and `npm run synth` in `infra/`.
 
+### Clerk development test accounts
+
+These fictional phone numbers exist only in the Fido Clerk development instance. On the password screen, choose **Use another method**, select the phone-code option, and enter Clerk's development test code `424242`.
+
+| Phone | Name | Fido role |
+| --- | --- | --- |
+| `+1 201-555-0110` | Maya Owner | Owner |
+| `+1 201-555-0111` | Jordan Owner | Owner |
+| `+1 201-555-0112` | Casey Reviewer | Shelter staff |
+| `+1 201-555-0113` | Alex Administrator | Shelter administrator |
+
+The shelter accounts belong to the synthetic **Harbor Shelter Local** organization. Never reproduce these test identifiers or the fixed OTP in a production Clerk instance.
+
 ## Required checks
 
 Before opening a change, run the same lint, type, unit, audit, build, OpenAPI drift, CDK synth/nag, container, and end-to-end checks defined in `.github/workflows/ci.yml`.
