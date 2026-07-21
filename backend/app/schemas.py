@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from .models import CustodyEventType, DisputeStatus, InquiryState
+from .models import CustodyEventType, DisputeStatus
 
 
 class Page(BaseModel):
@@ -107,17 +107,26 @@ class WebhookEnvelope(BaseModel):
     data: dict[str, Any]
 
 
-class StripeVerificationResult(BaseModel):
-    session_id: str
-    state: InquiryState
-    reference_id: str | None = None
-    display_name: str | None = Field(None, max_length=200)
-    report_id: str | None = None
-    document_number: str | None = None
-    document_type: str | None = None
-    issuing_country: str | None = None
-    dob: str | None = None
-    address: dict[str, Any] | None = None
-    phone: str | None = None
-    id_number_last4: str | None = None
-    reason_category: str | None = None
+class ManualIdentityEvidence(BaseModel):
+    verification_code: str = Field(min_length=16, max_length=80)
+    full_name: str = Field(min_length=2, max_length=200)
+    date_of_birth: date
+    address_line1: str = Field(min_length=2, max_length=200)
+    address_line2: str | None = Field(None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    region: str = Field(min_length=1, max_length=100)
+    postal_code: str = Field(min_length=2, max_length=20)
+    country: str = Field(min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
+    phone: str | None = Field(None, min_length=7, max_length=30)
+    government_id_last4: str | None = Field(None, min_length=4, max_length=4, pattern=r"^\d{4}$")
+    document_type: Literal["driving_license", "state_id", "passport"]
+    document_number: str = Field(min_length=4, max_length=80)
+    issuing_jurisdiction: str = Field(min_length=2, max_length=100)
+    document_expiration: date
+    physical_document_examined: bool
+    likeness_matches: bool
+    owner_consented: bool
+
+
+class ManualReviewResolve(ReviewResolve):
+    pass

@@ -1,5 +1,5 @@
 import { UserButton } from "@clerk/react";
-import { ClipboardList, HeartHandshake, LogOut, PawPrint, QrCode, ShieldCheck, UserRound } from "lucide-react";
+import { ClipboardList, Fingerprint, HeartHandshake, LogOut, PawPrint, QrCode, ShieldCheck, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSession } from "../auth/AuthContext";
@@ -7,7 +7,7 @@ import { api } from "../api/client";
 import { ErrorState, LoadingState } from "./States";
 
 const ownerLinks = [{ to: "/owner/history", label: "Care history", icon: HeartHandshake }, { to: "/owner/pass", label: "Share history", icon: QrCode }, { to: "/owner/account", label: "Account", icon: UserRound }];
-const shelterLinks = [{ to: "/shelter/queue", label: "Active records", icon: ClipboardList }, { to: "/shelter/pets", label: "Pet registry", icon: PawPrint }, { to: "/shelter/lookup", label: "Owner lookup", icon: QrCode }, { to: "/shelter/disputes", label: "Disputes", icon: ShieldCheck }];
+const shelterLinks = [{ to: "/shelter/queue", label: "Active records", icon: ClipboardList }, { to: "/shelter/identity", label: "Identity desk", icon: Fingerprint }, { to: "/shelter/pets", label: "Pet registry", icon: PawPrint }, { to: "/shelter/lookup", label: "Owner lookup", icon: QrCode }, { to: "/shelter/disputes", label: "Disputes", icon: ShieldCheck }];
 
 export function AppShell() {
   const { name, provider, signOut } = useSession();
@@ -21,7 +21,7 @@ export function AppShell() {
   const shelter = viewer.data.mode === "shelter";
   const links = shelter ? shelterLinks : ownerLinks;
   return <div className="app-shell">
-    {demo && <div className="sandbox-banner" role="status">Sandbox demo — synthetic data only. Clerk and Stripe Identity are not active.</div>}
+    {demo && <div className="sandbox-banner" role="status">Sandbox demo — synthetic data only. Clerk is not active.</div>}
     <header className="topbar"><NavLink className="wordmark" to={shelter ? "/shelter/queue" : "/owner/history"}><span className="tag-mark">F</span><span>Fido</span></NavLink><div className="context"><span className="mode-label">{shelter ? viewer.data.shelter?.name : "My records"}</span><span>{viewer.data.name || name}</span>{provider === "clerk" ? <UserButton /> : <button className="icon-button" onClick={() => void signOut()} aria-label="Sign out"><LogOut size={18} /></button>}</div></header>
     <nav className="primary-nav" aria-label="Primary navigation">{links.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
     <main className="workspace" id="main"><Outlet context={{ viewer: viewer.data }} /></main>

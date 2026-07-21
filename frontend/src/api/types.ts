@@ -41,6 +41,15 @@ export interface LookupTokenResponse { token: string; expiresAt: string; }
 export interface LookupSession { id: string; personDisplayName: string; expiresAt: string; history: HistoryEntry[]; }
 export interface AccessLogEntry { id: string; shelterName: string; staffDisplayName: string; accessedAt: string; }
 export interface Dispute { id: string; eventId: string; reason: string; status: DisputeStatus; createdAt: string; resolutionSummary?: string; }
+export interface ManualVerificationInput {
+  verificationCode: string; fullName: string; dateOfBirth: string;
+  addressLine1: string; addressLine2?: string; city: string; region: string; postalCode: string; country: string;
+  phone?: string; governmentIdLast4?: string; documentType: "driving_license" | "state_id" | "passport";
+  documentNumber: string; issuingJurisdiction: string; documentExpiration: string;
+  physicalDocumentExamined: boolean; likenessMatches: boolean; ownerConsented: boolean;
+}
+export interface IdentityCandidate { personId: string; displayName: string; classification: "exact" | "fuzzy"; confidence: number; evidence: string[]; }
+export interface IdentityReview { id: string; submittedName: string; classification: "fuzzy" | "conflict"; createdAt: string; requiresSecondReviewer: boolean; candidates: IdentityCandidate[]; }
 export interface CursorPage<T> { items: T[]; nextCursor?: string; }
 
 export interface ApiProblem {

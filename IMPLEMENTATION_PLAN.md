@@ -1,6 +1,6 @@
 # Fido Cross-Shelter Adoption History System
 
-> **Identity-provider update:** The original approved plan below records the initial Persona decision. The current implementation replaces Persona with Stripe Identity and the privacy-preserving matching design in [docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md](docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md). That document supersedes the identity-provider-specific portions of this plan; the remaining product, privacy, and infrastructure requirements still apply.
+> **Identity workflow update:** The original approved plan below records the initial Persona decision. The current implementation uses shelter-operated physical-ID review and the privacy-preserving matching design in [docs/MANUAL_IDENTITY_RECONCILIATION_PLAN.md](docs/MANUAL_IDENTITY_RECONCILIATION_PLAN.md). That document supersedes the identity-provider-specific portions of this plan; the remaining product, privacy, and infrastructure requirements still apply.
 
 ## Summary
 

@@ -8,11 +8,10 @@ import secrets
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import httpx
 import jwt
-import stripe
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.types import Options
@@ -151,20 +150,6 @@ def verify_signed_payload(
     candidates = [part.split("=", 1)[-1].strip() for part in signature.split(",")]
     if not any(hmac.compare_digest(expected, item) for item in candidates):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid webhook signature")
-
-
-def verify_stripe_webhook(
-    raw: bytes, signature_header: str, secret: str, tolerance_seconds: int
-) -> dict[str, Any]:
-    if not secret:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Webhook is not configured")
-    try:
-        event = stripe.Webhook.construct_event(  # type: ignore[no-untyped-call]
-            raw, signature_header, secret, tolerance=tolerance_seconds
-        )
-    except (ValueError, stripe.SignatureVerificationError) as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid webhook signature") from exc
-    return cast(dict[str, Any], event.to_dict())
 
 
 def verify_clerk_webhook(

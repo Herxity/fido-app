@@ -165,6 +165,37 @@ textarea { padding: 12px; resize: vertical; line-height: 1.5; }
 .lookup-panel aside { margin-top: 24px; padding: 16px; background: var(--exam-paper); }
 .lookup-panel aside p { margin: 4px 0 0; color: var(--slate-soft); font-size: .84rem; }
 .neutral-callout { display: flex; flex-direction: column; margin: 20px 0 8px; }
+.verification-ticket { display: grid; grid-template-columns: 40px 1fr auto; align-items: start; gap: 16px; padding: 24px; border: 1px solid var(--border-standard); border-radius: var(--radius-lg); background: var(--exam-raised); }
+.verification-ticket > svg { padding: 8px; box-sizing: content-box; border-radius: var(--radius-sm); background: #dce9df; color: var(--chart-green); }
+.verification-ticket h2 { margin-bottom: 12px; }
+.verification-ticket code { display: block; overflow-wrap: anywhere; margin-bottom: 12px; padding: 12px; border-radius: var(--radius-sm); background: var(--exam-inset); color: var(--leash-navy); font-size: 1rem; letter-spacing: .04em; }
+.verification-ticket p:last-child { margin-bottom: 0; color: var(--slate-soft); font-size: .86rem; }
+.scan-ledger { display: grid; grid-template-columns: 1fr auto; gap: 12px 24px; padding: 24px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--exam-raised); }
+.scan-ledger > div:first-child { max-width: 680px; }
+.scan-ledger h2 { margin-bottom: 6px; }
+.scan-ledger p { margin-bottom: 0; color: var(--slate-soft); font-size: .88rem; }
+.scan-ledger > label, .scan-ledger > .scan-input, .scan-ledger > .status-note, .camera-frame { grid-column: 1 / -1; }
+.camera-frame { position: relative; min-height: 280px; overflow: hidden; border-radius: var(--radius-md); background: var(--leash-navy); }
+.camera-frame video { display: block; width: 100%; max-height: 440px; object-fit: cover; }
+.camera-close { position: absolute; top: 12px; right: 12px; background: var(--exam-raised); }
+.identity-form { display: grid; gap: 20px; }
+.identity-form .section-heading { margin-bottom: 4px; }
+.attestations { display: grid; gap: 12px; margin: 0; padding: 18px; border: 1px solid var(--border-soft); border-radius: var(--radius-md); background: var(--exam-paper); }
+.attestations legend { padding: 0 6px; color: var(--leash-navy); font-family: Charter, Georgia, serif; font-weight: 700; }
+.submission-result { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md); background: #dce9df; color: var(--chart-green); }
+.submission-result div { display: grid; gap: 2px; }
+.submission-result span { font-size: .8rem; text-transform: capitalize; }
+.review-ledger { display: grid; gap: 0; }
+.review-case { display: grid; gap: 16px; padding: 24px 0; border-bottom: 1px solid var(--border-soft); }
+.review-case:last-child { border-bottom: 0; }
+.review-case > header { display: flex; justify-content: space-between; gap: 20px; }
+.review-case h3 { margin: 8px 0 3px; }
+.review-case small { color: var(--slate-faint); }
+.second-reviewer { display: flex; align-items: center; gap: 6px; color: var(--rust); font-size: .8rem; font-weight: 700; }
+.candidate-list { display: grid; gap: 8px; }
+.candidate { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; align-items: center; gap: 16px; padding: 14px; border-radius: var(--radius-md); background: var(--exam-paper); }
+.candidate > div { display: grid; gap: 4px; }
+.candidate span, .candidate data { color: var(--slate-faint); font-size: .78rem; }
 .dispute-row { display: flex; justify-content: space-between; gap: 24px; align-items: center; padding: 20px 0; }
 .dispute-row h2 { margin: 8px 0 4px; font-size: 1.2rem; }
 .dispute-row p { margin-bottom: 5px; color: var(--slate-soft); }
@@ -212,4 +243,8 @@ textarea { padding: 12px; resize: vertical; line-height: 1.5; }
   .registry-list li .status { grid-column: 2; }
   .kennel-card dl { grid-template-columns: 1fr; }
   .form-actions { flex-direction: column-reverse; }
+  .verification-ticket, .candidate { grid-template-columns: 1fr; }
+  .scan-ledger { grid-template-columns: 1fr; }
+  .scan-actions .button { width: 100%; }
+  .review-case > header { flex-direction: column; }
 }

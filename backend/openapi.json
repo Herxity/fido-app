@@ -223,6 +223,154 @@
         "title": "LookupRedeem",
         "type": "object"
       },
+      "ManualIdentityEvidence": {
+        "properties": {
+          "address_line1": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Address Line1",
+            "type": "string"
+          },
+          "address_line2": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address Line2"
+          },
+          "city": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "City",
+            "type": "string"
+          },
+          "country": {
+            "maxLength": 2,
+            "minLength": 2,
+            "pattern": "^[A-Za-z]{2}$",
+            "title": "Country",
+            "type": "string"
+          },
+          "date_of_birth": {
+            "format": "date",
+            "title": "Date Of Birth",
+            "type": "string"
+          },
+          "document_expiration": {
+            "format": "date",
+            "title": "Document Expiration",
+            "type": "string"
+          },
+          "document_number": {
+            "maxLength": 80,
+            "minLength": 4,
+            "title": "Document Number",
+            "type": "string"
+          },
+          "document_type": {
+            "enum": [
+              "driving_license",
+              "state_id",
+              "passport"
+            ],
+            "title": "Document Type",
+            "type": "string"
+          },
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "government_id_last4": {
+            "anyOf": [
+              {
+                "maxLength": 4,
+                "minLength": 4,
+                "pattern": "^\\d{4}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Government Id Last4"
+          },
+          "issuing_jurisdiction": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Issuing Jurisdiction",
+            "type": "string"
+          },
+          "likeness_matches": {
+            "title": "Likeness Matches",
+            "type": "boolean"
+          },
+          "owner_consented": {
+            "title": "Owner Consented",
+            "type": "boolean"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "minLength": 7,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "physical_document_examined": {
+            "title": "Physical Document Examined",
+            "type": "boolean"
+          },
+          "postal_code": {
+            "maxLength": 20,
+            "minLength": 2,
+            "title": "Postal Code",
+            "type": "string"
+          },
+          "region": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Region",
+            "type": "string"
+          },
+          "verification_code": {
+            "maxLength": 80,
+            "minLength": 16,
+            "title": "Verification Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verification_code",
+          "full_name",
+          "date_of_birth",
+          "address_line1",
+          "city",
+          "region",
+          "postal_code",
+          "country",
+          "document_type",
+          "document_number",
+          "issuing_jurisdiction",
+          "document_expiration",
+          "physical_document_examined",
+          "likeness_matches",
+          "owner_consented"
+        ],
+        "title": "ManualIdentityEvidence",
+        "type": "object"
+      },
       "PetCreate": {
         "properties": {
           "altered": {
@@ -512,112 +660,6 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/api/v1/admin/identity-reviews": {
-      "get": {
-        "operationId": "identity_reviews_api_v1_admin_identity_reviews_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Identity Reviews Api V1 Admin Identity Reviews Get",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Identity Reviews"
-      }
-    },
-    "/api/v1/admin/identity-reviews/{review_id}/resolve": {
-      "post": {
-        "operationId": "resolve_review_api_v1_admin_identity_reviews__review_id__resolve_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "review_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Review Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReviewResolve"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Resolve Review Api V1 Admin Identity Reviews  Review Id  Resolve Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Resolve Review"
-      }
-    },
     "/api/v1/admin/people/{source_person_id}/merge": {
       "post": {
         "operationId": "merge_api_v1_admin_people__source_person_id__merge_post",
@@ -974,6 +1016,157 @@
           }
         ],
         "summary": "Create Inquiry"
+      }
+    },
+    "/api/v1/identity/manual-reviews": {
+      "get": {
+        "operationId": "identity_reviews_api_v1_identity_manual_reviews_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Identity Reviews Api V1 Identity Manual Reviews Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Identity Reviews"
+      }
+    },
+    "/api/v1/identity/manual-reviews/{review_id}/resolve": {
+      "post": {
+        "operationId": "resolve_review_api_v1_identity_manual_reviews__review_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewResolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resolve Review Api V1 Identity Manual Reviews  Review Id  Resolve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Review"
+      }
+    },
+    "/api/v1/identity/manual-verifications": {
+      "post": {
+        "operationId": "submit_manual_verification_api_v1_identity_manual_verifications_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualIdentityEvidence"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Submit Manual Verification Api V1 Identity Manual Verifications Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Submit Manual Verification"
       }
     },
     "/api/v1/identity/status": {
@@ -1600,26 +1793,6 @@
           }
         },
         "summary": "Clerk Webhook"
-      }
-    },
-    "/api/v1/webhooks/stripe": {
-      "post": {
-        "operationId": "stripe_identity_webhook_api_v1_webhooks_stripe_post",
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Stripe Identity Webhook Api V1 Webhooks Stripe Post",
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Stripe Identity Webhook"
       }
     }
   }

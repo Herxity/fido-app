@@ -4,7 +4,7 @@ import { api } from "../../api/client";
 import type { HistoryEntry, Viewer } from "../../api/types";
 import { CareTimeline } from "../../components/CareTimeline";
 import { EmptyState, ErrorState, LoadingState, StatusPill } from "../../components/States";
-import { StripeIdentityFlow } from "../../identity/StripeIdentityFlow";
+import { ShelterVerificationRequest } from "../../identity/ShelterVerificationRequest";
 
 export function OwnerHistory() {
   const navigate = useNavigate();
@@ -14,8 +14,8 @@ export function OwnerHistory() {
   const history = useQuery({ queryKey: ["owner-history"], queryFn: api.getHistory, enabled: identityApproved });
   if (!identityApproved) return <div className="page-stack narrow">
     <header className="page-header"><div><p className="eyebrow">Your factual record</p><h1>Verify your identity</h1><p>Before Fido can connect or display care history, confirm that this account belongs to you.</p></div><StatusPill tone="attention">{viewer.identityStatus === "pending" ? "Verification pending" : "Identity required"}</StatusPill></header>
-    <StripeIdentityFlow onComplete={() => { void queryClient.invalidateQueries({ queryKey: ["me"] }); }} />
-    <div className="neutral-callout"><strong>Your new account is ready.</strong><span>There is no connection problem. Care history stays closed until Stripe returns a verified identity result and Fido completes duplicate review.</span></div>
+    <ShelterVerificationRequest onComplete={() => { void queryClient.invalidateQueries({ queryKey: ["me"] }); }} />
+    <div className="neutral-callout"><strong>Your new account is ready.</strong><span>There is no connection problem. Care history stays closed until a shelter verifies your physical ID and any possible duplicate is reconciled.</span></div>
   </div>;
   if (history.isLoading) return <LoadingState />;
   if (history.isError) return <ErrorState retry={() => void history.refetch()} />;

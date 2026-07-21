@@ -15,6 +15,7 @@ from .models import (
     AuditLog,
     CustodyEvent,
     IdentityInquiry,
+    IdentityMatchCandidate,
     IdentitySignal,
     InquiryState,
     LinkStatus,
@@ -25,7 +26,7 @@ from .models import (
     UserAccount,
     now,
 )
-from .schemas import StripeVerificationResult
+from .schemas import ManualIdentityEvidence
 from .security import Principal, keyed_hash, opaque_token
 
 
@@ -77,61 +78,93 @@ async def canonical_person(session: AsyncSession, person_id: uuid.UUID) -> Perso
     return person
 
 
-async def process_stripe_result(
-    session: AsyncSession, result: StripeVerificationResult, identity_hash_key: str
-) -> None:
-    inquiry = await session.scalar(
-        select(IdentityInquiry)
-        .where(IdentityInquiry.provider_session_id == result.session_id)
-        .with_for_update()
-    )
-    if inquiry is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Unknown inquiry reference")
-    if inquiry.state in {InquiryState.approved, InquiryState.declined, InquiryState.superseded}:
-        return
+async def reconcile_manual_identity(
+    session: AsyncSession,
+    inquiry: IdentityInquiry,
+    evidence: ManualIdentityEvidence,
+    identity_hash_key: str,
+) -> str:
     account = await session.get(UserAccount, inquiry.user_account_id, with_for_update=True)
     if account is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Account linkage is unavailable")
     inquiry.received_at = now()
-    inquiry.provider_report_id = result.report_id
-    inquiry.reason_category = result.reason_category
-    if result.state == InquiryState.pending:
-        inquiry.state = InquiryState.pending
-        return
-    if result.state == InquiryState.declined:
-        inquiry.state = InquiryState.declined
-        inquiry.resolved_at = now()
-        account.status = LinkStatus.pending
-        return
-    if result.state != InquiryState.approved:
-        inquiry.state = InquiryState.needs_review
-        account.status = LinkStatus.recovery
-        return
-
-    signals = derive_identity_signals(result, identity_hash_key)
-    stable_signals = [signal for signal in signals if signal.assurance != "weak"]
-    if not any(signal.signal_type == "document_semantic" for signal in signals):
-        inquiry.state = InquiryState.needs_review
-        inquiry.reason_category = "stable_document_signal_unavailable"
-        account.status = LinkStatus.recovery
-        return
-
+    signals = derive_identity_signals(evidence, identity_hash_key)
     conditions = [
         (IdentitySignal.signal_type == signal.signal_type)
         & (IdentitySignal.value_hash == signal.value_hash)
-        for signal in stable_signals
+        for signal in signals
     ]
-    matches = (
-        (await session.scalars(select(IdentitySignal).where(or_(*conditions)))).all()
-        if conditions
-        else []
-    )
-    matched_people = {match.person_id for match in matches if match.person_id is not None}
-    if matched_people:
+    matches = (await session.scalars(select(IdentitySignal).where(or_(*conditions)))).all()
+    current_by_hash = {(signal.signal_type, signal.value_hash) for signal in signals}
+    name_ngrams = {digest for kind, digest in current_by_hash if kind == "name_ngram"}
+    address_ngrams = {digest for kind, digest in current_by_hash if kind == "address_ngram"}
+    by_person: dict[uuid.UUID, set[tuple[str, str]]] = {}
+    for match in matches:
+        if match.person_id is not None:
+            by_person.setdefault(match.person_id, set()).add((match.signal_type, match.value_hash))
+
+    candidates: list[tuple[uuid.UUID, str, int, list[str]]] = []
+    for person_id, person_matches in by_person.items():
+        types = {kind for kind, _digest in person_matches}
+        matched_name = len(
+            {digest for kind, digest in person_matches if kind == "name_ngram"} & name_ngrams
+        )
+        matched_address = len(
+            {digest for kind, digest in person_matches if kind == "address_ngram"} & address_ngrams
+        )
+        name_ratio = matched_name / max(len(name_ngrams), 1)
+        address_ratio = matched_address / max(len(address_ngrams), 1)
+        exact_document = "document_semantic" in types
+        exact_name_dob = "name_dob" in types
+        dob_match = "dob" in types
+        evidence_types: list[str] = []
+        if exact_document:
+            evidence_types.append("same_document")
+        if exact_name_dob:
+            evidence_types.append("same_name_and_dob")
+        if "address_dob" in types:
+            evidence_types.append("same_address_and_dob")
+        if "id_last4_name_dob" in types:
+            evidence_types.append("same_last4_name_and_dob")
+        if name_ratio >= 0.65:
+            evidence_types.append("similar_name")
+        if address_ratio >= 0.60:
+            evidence_types.append("similar_address")
+        if exact_document and (exact_name_dob or (dob_match and name_ratio >= 0.70)):
+            candidates.append((person_id, "exact", 100, evidence_types))
+        elif exact_document:
+            candidates.append((person_id, "fuzzy", 85, evidence_types))
+        elif exact_name_dob:
+            candidates.append((person_id, "fuzzy", 80, evidence_types))
+        elif dob_match and name_ratio >= 0.65:
+            candidates.append(
+                (person_id, "fuzzy", min(79, round(55 + name_ratio * 25)), evidence_types)
+            )
+        elif "address_dob" in types and name_ratio >= 0.40:
+            candidates.append((person_id, "fuzzy", 65, evidence_types))
+
+    exact = [candidate for candidate in candidates if candidate[1] == "exact"]
+    candidate_people = {candidate[0] for candidate in candidates}
+    if len(exact) == 1 and candidate_people == {exact[0][0]}:
+        person = await canonical_person(session, exact[0][0])
+        classification = "exact_existing"
+    elif candidates:
+        classification = "conflict" if len(candidate_people) > 1 or len(exact) > 1 else "fuzzy"
         inquiry.state = InquiryState.needs_review
+        inquiry.match_classification = classification
         inquiry.repeat_outcome = "possible_existing_identity"
-        inquiry.reason_category = "duplicate_identity_signal"
+        inquiry.reason_category = f"{classification}_identity_match"
         account.status = LinkStatus.recovery
+        for person_id, candidate_class, confidence, evidence_types in candidates:
+            session.add(
+                IdentityMatchCandidate(
+                    identity_inquiry_id=inquiry.id,
+                    person_id=person_id,
+                    classification=candidate_class,
+                    confidence=confidence,
+                    evidence_summary=",".join(sorted(set(evidence_types))),
+                )
+            )
         for signal in signals:
             session.add(
                 IdentitySignal(
@@ -141,26 +174,22 @@ async def process_stripe_result(
                     assurance=signal.assurance,
                 )
             )
-        return
-
-    person = (
-        await canonical_person(session, account.person_id)
-        if account.person_id
-        else Person(status=PersonStatus.active)
-    )
-    if account.person_id is None:
+        return classification
+    else:
+        person = Person(status=PersonStatus.active)
+        classification = "new_identity"
         session.add(person)
         await session.flush()
     person.status = PersonStatus.active
     person.verified_at = now()
-    if result.display_name:
-        person.verified_display_name = result.display_name
+    person.verified_display_name = evidence.full_name
     account.person_id = person.id
     account.status = LinkStatus.active
-    account.link_reason = "stripe_identity_verified"
+    account.link_reason = "shelter_identity_verified"
     account.linked_at = now()
     inquiry.person_id = person.id
     inquiry.state = InquiryState.approved
+    inquiry.match_classification = classification
     inquiry.resolved_at = now()
     for signal in signals:
         session.add(
@@ -172,6 +201,7 @@ async def process_stripe_result(
                 assurance=signal.assurance,
             )
         )
+    return classification
 
 
 async def merge_people(

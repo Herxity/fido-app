@@ -12,7 +12,7 @@ test("shows identity onboarding instead of requesting protected history for a ne
   render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={["/owner/history"]}><Routes><Route element={<Outlet context={{ viewer }} />}><Route path="/owner/history" element={<OwnerHistory />} /></Route></Routes></MemoryRouter></QueryClientProvider>);
 
   expect(screen.getByRole("heading", { name: "Verify your identity" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Verify identity" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Get verification code" })).toBeInTheDocument();
   expect(screen.getByText(/There is no connection problem/)).toBeInTheDocument();
   expect(getHistory).not.toHaveBeenCalled();
 });

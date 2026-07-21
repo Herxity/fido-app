@@ -3,25 +3,27 @@ import logging
 import time
 import uuid
 from collections import defaultdict, deque
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import stripe
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger.json import JsonFormatter
-from sqlalchemy import and_, or_, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .config import Settings, get_settings
 from .db import get_session
+from .fraud import verification_code_hash
 from .models import (
     CustodyEvent,
     CustodyEventType,
     Dispute,
     DisputeStatus,
     IdentityInquiry,
+    IdentityMatchCandidate,
     IdentitySignal,
     InquiryState,
     LinkStatus,
@@ -35,20 +37,20 @@ from .models import (
     WebhookState,
     now,
 )
-from .providers import identity_provider
 from .schemas import (
     CorrectionCreate,
     CustodyCreate,
     DisputeCreate,
     DisputePatch,
     LookupRedeem,
+    ManualIdentityEvidence,
     PetCreate,
     PetPatch,
     ReviewResolve,
     decode_cursor,
     encode_cursor,
 )
-from .security import Principal, require_roles, verify_clerk_webhook, verify_stripe_webhook
+from .security import Principal, opaque_token, require_roles, verify_clerk_webhook
 from .services import (
     audit,
     canonical_person,
@@ -57,7 +59,7 @@ from .services import (
     get_account,
     insert_custody_idempotently,
     merge_people,
-    process_stripe_result,
+    reconcile_manual_identity,
     redeem_lookup_token,
     shelter_for_principal,
     valid_lookup_session,
@@ -285,42 +287,27 @@ async def create_inquiry(
 ) -> dict[str, Any]:
     rate_limiter.check(f"identity:{principal.user_id}", 5, 3600)
     account, _ = await owner_account(session, principal)
-    pending = await session.scalar(
-        select(IdentityInquiry)
-        .where(
-            IdentityInquiry.user_account_id == account.id,
-            IdentityInquiry.state == InquiryState.pending,
-        )
-        .order_by(IdentityInquiry.created_at.desc())
-    )
-    if pending:
-        try:
-            resumed = await identity_provider(config).resume_session(pending.provider_session_id)
-        except (stripe.StripeError, RuntimeError) as exc:
-            logger.warning(
-                "stripe_identity.unavailable", extra={"request_id": request.state.request_id}
+    if account.status == LinkStatus.active:
+        raise HTTPException(409, "Identity is already verified")
+    pending_rows = (
+        await session.scalars(
+            select(IdentityInquiry).where(
+                IdentityInquiry.user_account_id == account.id,
+                IdentityInquiry.state == InquiryState.pending,
             )
-            raise HTTPException(503, "Identity provider temporarily unavailable") from exc
-        return {
-            "id": pending.id,
-            "verification_session_id": pending.provider_session_id,
-            "client_secret": resumed.get("client_secret"),
-            "status": resumed.get("status", pending.state),
-        }
-    reference = uuid.uuid4()
-    try:
-        result = await identity_provider(config).create_session(reference)
-    except (stripe.StripeError, RuntimeError) as exc:
-        logger.warning(
-            "stripe_identity.unavailable", extra={"request_id": request.state.request_id}
         )
-        raise HTTPException(503, "Identity provider temporarily unavailable") from exc
+    ).all()
+    for pending in pending_rows:
+        pending.state = InquiryState.superseded
+        pending.resolved_at = now()
+    reference = uuid.uuid4()
+    verification_code = opaque_token()
     inquiry = IdentityInquiry(
         user_account_id=account.id,
         person_id=account.person_id,
         reference_id=reference,
-        provider="stripe",
-        provider_session_id=result["id"],
+        provider="shelter_manual",
+        provider_session_id=verification_code_hash(verification_code, config.identity_hash_key),
     )
     session.add(inquiry)
     await session.flush()
@@ -335,9 +322,83 @@ async def create_inquiry(
     await session.commit()
     return {
         "id": inquiry.id,
-        "verification_session_id": inquiry.provider_session_id,
-        "client_secret": result.get("client_secret"),
+        "verification_code": verification_code,
+        "expires_at": inquiry.created_at + timedelta(hours=24),
         "status": inquiry.state,
+    }
+
+
+@app.post("/api/v1/identity/manual-verifications", status_code=201)
+async def submit_manual_verification(
+    payload: ManualIdentityEvidence,
+    request: Request,
+    principal: Principal = Depends(require_roles("shelter_admin", "shelter_staff")),
+    session: AsyncSession = Depends(get_session),
+    config: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    shelter = await shelter_for_principal(session, principal)
+    rate_limiter.check(f"manual-identity:{principal.user_id}", 30, 3600)
+    if not all(
+        (payload.physical_document_examined, payload.likeness_matches, payload.owner_consented)
+    ):
+        raise HTTPException(422, "All physical verification attestations are required")
+    today = datetime.now(UTC).date()
+    if payload.document_expiration < today:
+        raise HTTPException(422, "Expired identity document")
+    try:
+        adult_cutoff = today.replace(year=today.year - 18)
+    except ValueError:
+        adult_cutoff = today.replace(year=today.year - 18, day=28)
+    if payload.date_of_birth > adult_cutoff:
+        raise HTTPException(422, "Owner must be at least 18 years old")
+    try:
+        oldest_plausible = today.replace(year=today.year - 120)
+    except ValueError:
+        oldest_plausible = today.replace(year=today.year - 120, day=28)
+    if payload.date_of_birth < oldest_plausible:
+        raise HTTPException(422, "Date of birth is outside the supported range")
+    code_hash = verification_code_hash(payload.verification_code, config.identity_hash_key)
+    inquiry = await session.scalar(
+        select(IdentityInquiry)
+        .where(
+            IdentityInquiry.provider == "shelter_manual",
+            IdentityInquiry.provider_session_id == code_hash,
+        )
+        .with_for_update()
+    )
+    if inquiry is None:
+        raise HTTPException(404, "Verification request is invalid or expired")
+    created_at = inquiry.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    if inquiry.state != InquiryState.pending or created_at < now() - timedelta(hours=24):
+        raise HTTPException(404, "Verification request is invalid or expired")
+    inquiry.reviewing_shelter_id = shelter.id
+    inquiry.submitted_by_user_id = principal.user_id
+    inquiry.submitted_display_name = payload.full_name
+    classification = await reconcile_manual_identity(
+        session, inquiry, payload, config.identity_hash_key
+    )
+    candidate_count = await session.scalar(
+        select(func.count())
+        .select_from(IdentityMatchCandidate)
+        .where(IdentityMatchCandidate.identity_inquiry_id == inquiry.id)
+    )
+    await audit(
+        session,
+        principal,
+        "identity.manual_verify",
+        "identity_inquiry",
+        str(inquiry.id),
+        request_id=request.state.request_id,
+        metadata={"classification": classification, "candidate_count": candidate_count or 0},
+    )
+    await session.commit()
+    return {
+        "id": inquiry.id,
+        "state": inquiry.state,
+        "classification": classification,
+        "candidate_count": candidate_count or 0,
     }
 
 
@@ -801,51 +862,97 @@ async def patch_dispute(
     }
 
 
-@app.get("/api/v1/admin/identity-reviews")
+@app.get("/api/v1/identity/manual-reviews")
 async def identity_reviews(
     limit: int = Query(50, ge=1, le=100),
-    principal: Principal = Depends(require_roles("platform_admin")),
+    principal: Principal = Depends(
+        require_roles("shelter_admin", "shelter_staff", "platform_admin")
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    shelter = None
+    if principal.role != "platform_admin":
+        shelter = await shelter_for_principal(session, principal)
+    criteria = [IdentityInquiry.state == InquiryState.needs_review]
+    if shelter is not None:
+        criteria.append(IdentityInquiry.reviewing_shelter_id == shelter.id)
     rows = (
         await session.scalars(
             select(IdentityInquiry)
-            .where(IdentityInquiry.state == InquiryState.needs_review)
+            .where(*criteria)
             .order_by(IdentityInquiry.created_at)
             .limit(limit)
         )
     ).all()
-    return {
-        "items": [
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        candidates = (
+            await session.execute(
+                select(IdentityMatchCandidate, Person)
+                .join(Person, Person.id == IdentityMatchCandidate.person_id)
+                .where(IdentityMatchCandidate.identity_inquiry_id == row.id)
+                .order_by(IdentityMatchCandidate.confidence.desc())
+            )
+        ).all()
+        items.append(
             {
                 "id": row.id,
                 "state": row.state,
+                "submitted_name": row.submitted_display_name,
+                "classification": row.match_classification,
                 "reason_category": row.reason_category,
-                "repeat_outcome": row.repeat_outcome,
                 "created_at": row.created_at,
+                "requires_second_reviewer": row.submitted_by_user_id == principal.user_id,
+                "candidates": [
+                    {
+                        "person_id": candidate.person_id,
+                        "display_name": person.verified_display_name,
+                        "classification": candidate.classification,
+                        "confidence": candidate.confidence,
+                        "evidence": candidate.evidence_summary.split(","),
+                    }
+                    for candidate, person in candidates
+                ],
             }
-            for row in rows
-        ],
+        )
+    return {
+        "items": items,
         "next_cursor": None,
     }
 
 
-@app.post("/api/v1/admin/identity-reviews/{review_id}/resolve")
+@app.post("/api/v1/identity/manual-reviews/{review_id}/resolve")
 async def resolve_review(
     review_id: uuid.UUID,
     payload: ReviewResolve,
     request: Request,
-    principal: Principal = Depends(require_roles("platform_admin")),
+    principal: Principal = Depends(
+        require_roles("shelter_admin", "shelter_staff", "platform_admin")
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     inquiry = await session.get(IdentityInquiry, review_id, with_for_update=True)
     if inquiry is None or inquiry.state != InquiryState.needs_review:
         raise HTTPException(404, "Review not found")
+    if principal.role != "platform_admin":
+        shelter = await shelter_for_principal(session, principal)
+        if inquiry.reviewing_shelter_id != shelter.id:
+            raise HTTPException(404, "Review not found")
+        if inquiry.submitted_by_user_id == principal.user_id:
+            raise HTTPException(409, "A second employee must resolve an ambiguous match")
     account = await session.get(UserAccount, inquiry.user_account_id, with_for_update=True)
     assert account
     if payload.decision == "link_existing":
         if payload.target_person_id is None:
             raise HTTPException(422, "target_person_id is required")
+        candidate = await session.scalar(
+            select(IdentityMatchCandidate).where(
+                IdentityMatchCandidate.identity_inquiry_id == inquiry.id,
+                IdentityMatchCandidate.person_id == payload.target_person_id,
+            )
+        )
+        if candidate is None:
+            raise HTTPException(422, "target_person_id must be a reconciliation candidate")
         person = await canonical_person(session, payload.target_person_id)
         account.person_id, account.status, account.link_reason, account.linked_at = (
             person.id,
@@ -859,7 +966,11 @@ async def resolve_review(
             now(),
         )
     elif payload.decision == "approve_new":
-        person = Person(status=PersonStatus.active, verified_at=now())
+        person = Person(
+            status=PersonStatus.active,
+            verified_display_name=inquiry.submitted_display_name,
+            verified_at=now(),
+        )
         session.add(person)
         await session.flush()
         account.person_id, account.status, account.link_reason, account.linked_at = (
@@ -928,66 +1039,6 @@ async def persist_webhook(
     session.add(row)
     await session.flush()
     return row, False
-
-
-@app.post("/api/v1/webhooks/stripe", status_code=202)
-async def stripe_identity_webhook(
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-    config: Settings = Depends(get_settings),
-) -> dict[str, Any]:
-    raw = await request.body()
-    signature = request.headers.get("stripe-signature", "")
-    payload = verify_stripe_webhook(
-        raw,
-        signature,
-        config.stripe_webhook_secret,
-        config.webhook_tolerance_seconds,
-    )
-    event_id = str(payload.get("id", ""))
-    event_type = str(payload.get("type", ""))
-    event_object = payload.get("data", {}).get("object", {})
-    provider_session_id = str(event_object.get("id", ""))
-    if not event_id or not event_type:
-        raise HTTPException(422, "Invalid webhook envelope")
-    event, duplicate = await persist_webhook(session, "stripe", event_id, event_type)
-    if duplicate:
-        return {"accepted": True, "duplicate": True}
-    try:
-        if event_type in {
-            "identity.verification_session.processing",
-            "identity.verification_session.verified",
-            "identity.verification_session.requires_input",
-            "identity.verification_session.canceled",
-        }:
-            if not provider_session_id:
-                raise HTTPException(422, "Verification session is missing")
-            result = await identity_provider(config).retrieve_result(provider_session_id)
-            inquiry = await session.scalar(
-                select(IdentityInquiry).where(
-                    IdentityInquiry.provider_session_id == provider_session_id
-                )
-            )
-            if inquiry is None or (
-                result.reference_id and result.reference_id != str(inquiry.reference_id)
-            ):
-                raise HTTPException(422, "Verification session binding is invalid")
-            await process_stripe_result(session, result, config.identity_hash_key)
-        event.state, event.processed_at = WebhookState.processed, now()
-        await audit(
-            session,
-            None,
-            "webhook.stripe_identity.process",
-            "webhook_event",
-            str(event.id),
-            request_id=request.state.request_id,
-        )
-        await session.commit()
-    except Exception as exc:
-        event.state, event.sanitized_failure = WebhookState.retry, type(exc).__name__
-        await session.commit()
-        raise
-    return {"accepted": True, "duplicate": False}
 
 
 @app.post("/api/v1/webhooks/clerk", status_code=202)

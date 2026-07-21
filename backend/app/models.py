@@ -197,9 +197,15 @@ class IdentityInquiry(Base):
         ForeignKey("people.id", ondelete="RESTRICT")
     )
     reference_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
-    provider: Mapped[str] = mapped_column(String(30), default="stripe")
+    provider: Mapped[str] = mapped_column(String(30), default="shelter_manual")
     provider_session_id: Mapped[str] = mapped_column(String(200), unique=True)
     provider_report_id: Mapped[str | None] = mapped_column(String(200))
+    reviewing_shelter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("shelters.id", ondelete="RESTRICT"), index=True
+    )
+    submitted_by_user_id: Mapped[str | None] = mapped_column(String(200))
+    submitted_display_name: Mapped[str | None] = mapped_column(String(200))
+    match_classification: Mapped[str | None] = mapped_column(String(40))
     state: Mapped[InquiryState] = mapped_column(Enum(InquiryState), default=InquiryState.pending)
     repeat_outcome: Mapped[str | None] = mapped_column(String(80))
     reason_category: Mapped[str | None] = mapped_column(String(100))
@@ -226,7 +232,31 @@ class IdentitySignal(Base):
     __table_args__ = (
         Index("ix_identity_signal_match", "signal_type", "value_hash"),
         UniqueConstraint(
-            "identity_inquiry_id", "signal_type", name="uq_identity_signal_inquiry_type"
+            "identity_inquiry_id",
+            "signal_type",
+            "value_hash",
+            name="uq_identity_signal_inquiry_type_value",
+        ),
+    )
+
+
+class IdentityMatchCandidate(Base):
+    __tablename__ = "identity_match_candidates"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    identity_inquiry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("identity_inquiries.id", ondelete="RESTRICT"), index=True
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("people.id", ondelete="RESTRICT"), index=True
+    )
+    classification: Mapped[str] = mapped_column(String(40))
+    confidence: Mapped[int] = mapped_column(Integer)
+    evidence_summary: Mapped[str] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "identity_inquiry_id", "person_id", name="uq_identity_candidate_inquiry_person"
         ),
     )
 

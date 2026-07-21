@@ -8,6 +8,7 @@ import { OwnerLookup } from "./pages/shelter/OwnerLookup";
 import { PetDetail, RegistryWelcome } from "./pages/shelter/PetDetail";
 import { PetRegistry } from "./pages/shelter/PetRegistry";
 import { ShelterDisputes } from "./pages/shelter/ShelterDisputes";
+import { IdentityDesk } from "./pages/shelter/IdentityDesk";
 import { ShelterQueue } from "./pages/shelter/ShelterQueue";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
     <Route path="shelter/pets" element={<PetRegistry />}><Route index element={<RegistryWelcome />} /><Route path=":petId" element={<PetDetail />} /></Route>
     <Route path="shelter/lookup" element={<OwnerLookup />} />
     <Route path="shelter/disputes" element={<ShelterDisputes />} />
+    <Route path="shelter/identity" element={<IdentityDesk />} />
     <Route path="*" element={<Navigate to="/owner/history" replace />} />
   </Route></Routes>;
 }

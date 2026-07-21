@@ -25,12 +25,13 @@ def test_production_rejects_fake_provider() -> None:
         )
 
 
-def test_production_requires_stripe_identity_secrets() -> None:
-    with pytest.raises(ValueError, match="Stripe Identity"):
+def test_production_requires_identity_hash_key() -> None:
+    with pytest.raises(ValueError, match="identity hash key"):
         Settings(
             environment="production",
             provider_mode="live",
             clerk_authorized_parties=["https://x"],
+            identity_hash_key="short",
         )
 
 
@@ -116,6 +117,7 @@ async def test_auth_rejects_expired_and_platform_boundary(client, auth) -> None:
     assert (await client.get("/api/v1/me", headers=auth(expired=True))).status_code == 401
     assert (
         await client.get(
-            "/api/v1/admin/identity-reviews", headers=auth(role="shelter_admin", org_id="org1")
+            "/api/v1/identity/manual-reviews",
+            headers=auth(role="shelter_admin", org_id="org1"),
         )
     ).status_code == 403
