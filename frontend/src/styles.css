@@ -175,8 +175,17 @@ textarea { padding: 12px; resize: vertical; line-height: 1.5; }
 .scan-ledger h2 { margin-bottom: 6px; }
 .scan-ledger p { margin-bottom: 0; color: var(--slate-soft); font-size: .88rem; }
 .scan-ledger > label, .scan-ledger > .scan-input, .scan-ledger > .status-note, .camera-frame { grid-column: 1 / -1; }
+.scan-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.photo-button { margin: 0; font-size: inherit; }
 .camera-frame { position: relative; min-height: 280px; overflow: hidden; border-radius: var(--radius-md); background: var(--leash-navy); }
 .camera-frame video { display: block; width: 100%; max-height: 440px; object-fit: cover; }
+.camera-frame > p { position: absolute; left: 50%; bottom: 12px; width: max-content; max-width: calc(100% - 32px); transform: translateX(-50%); margin: 0; padding: 6px 10px; border-radius: var(--radius-sm); background: rgb(23 56 75 / 82%); color: white; font-size: .76rem; text-align: center; }
+.barcode-guide { position: absolute; inset: 50% auto auto 50%; width: min(78%, 620px); aspect-ratio: 3.2 / 1; transform: translate(-50%, -50%); border: 2px solid rgb(255 253 248 / 90%); border-radius: var(--radius-sm); box-shadow: 0 0 0 999px rgb(23 56 75 / 28%); }
+.barcode-guide::before, .barcode-guide::after, .barcode-guide span::before, .barcode-guide span::after { content: ""; position: absolute; width: 24px; height: 24px; border-color: var(--id-brass); }
+.barcode-guide::before { top: -3px; left: -3px; border-top: 4px solid var(--id-brass); border-left: 4px solid var(--id-brass); }
+.barcode-guide::after { top: -3px; right: -3px; border-top: 4px solid var(--id-brass); border-right: 4px solid var(--id-brass); }
+.barcode-guide span::before { bottom: -3px; left: -3px; border-bottom: 4px solid var(--id-brass); border-left: 4px solid var(--id-brass); }
+.barcode-guide span::after { right: -3px; bottom: -3px; border-right: 4px solid var(--id-brass); border-bottom: 4px solid var(--id-brass); }
 .camera-close { position: absolute; top: 12px; right: 12px; background: var(--exam-raised); }
 .identity-form { display: grid; gap: 20px; }
 .identity-form .section-heading { margin-bottom: 4px; }
