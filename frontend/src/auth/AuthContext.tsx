@@ -1,9 +1,9 @@
-import { ClerkProvider, SignIn, useAuth, useUser } from "@clerk/clerk-react";
+import { ClerkProvider, SignInButton, SignUpButton, useAuth, useUser } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { configureApiAuth, configureApiUnauthorized } from "../api/client";
 
-interface Session { ready: boolean; signedIn: boolean; name: string; getToken: () => Promise<string | null>; signOut: () => Promise<void>; }
+interface Session { ready: boolean; signedIn: boolean; name: string; provider: "clerk" | "demo"; getToken: () => Promise<string | null>; signOut: () => Promise<void>; }
 const SessionContext = createContext<Session | null>(null);
 export const useSession = () => {
   const value = useContext(SessionContext);
@@ -26,12 +26,12 @@ function ClerkSession({ children }: { children: ReactNode }) {
     return () => configureApiUnauthorized(() => undefined);
   }, [isLoaded, isSignedIn, queryClient]);
   const secureSignOut = async () => { queryClient.clear(); await signOut(); };
-  return <ApiAuthBridge session={{ ready: isLoaded, signedIn: Boolean(isSignedIn), name: user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account", getToken, signOut: secureSignOut }}>{children}</ApiAuthBridge>;
+  return <ApiAuthBridge session={{ ready: isLoaded, signedIn: Boolean(isSignedIn), name: user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account", provider: "clerk", getToken, signOut: secureSignOut }}>{children}</ApiAuthBridge>;
 }
 
 function DemoSession({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const session: Session = { ready: true, signedIn: true, name: "Demo account", getToken: async () => null, signOut: async () => { queryClient.clear(); } };
+  const session: Session = { ready: true, signedIn: true, name: "Demo account", provider: "demo", getToken: async () => null, signOut: async () => { queryClient.clear(); } };
   return <ApiAuthBridge session={session}>{children}</ApiAuthBridge>;
 }
 
@@ -52,6 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function AuthGate({ children }: { children: ReactNode }) {
   const session = useSession();
   if (!session.ready) return <div className="full-state" role="status"><span className="spinner" />Checking your session…</div>;
-  if (!session.signedIn) return <main className="sign-in"><div><p className="eyebrow">Fido records</p><h1>Your care history starts here.</h1><p>Use the email code sent by Clerk to sign in securely.</p></div><SignIn routing="hash" /></main>;
+  if (!session.signedIn) return <main className="sign-in"><div><p className="eyebrow">Fido records</p><h1>Your care history starts here.</h1><p>Sign in to review an existing care record, or create an account to begin a verified adoption history.</p><div className="auth-actions"><SignInButton mode="modal"><button className="button primary large">Sign in</button></SignInButton><SignUpButton mode="modal"><button className="button secondary large">Create account</button></SignUpButton></div></div><aside className="auth-note"><span className="tag-mark">F</span><div><strong>A record built around care.</strong><p>Your identity and care history remain protected until you authenticate.</p></div></aside></main>;
   return children;
 }
