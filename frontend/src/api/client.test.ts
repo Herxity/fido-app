@@ -35,6 +35,14 @@ test("turns FastAPI validation details into an actionable message", async () => 
   });
 });
 
+test("surfaces field errors from the API problem response", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ title: "Validation Failed", detail: "Request validation failed", errors: [{ location: "body.phone", code: "string_too_short", message: "String should have at least 7 characters" }] }), { status: 422, headers: { "Content-Type": "application/problem+json" } })));
+  await expect(api.submitManualVerification({} as never)).rejects.toMatchObject({
+    message: "phone: String should have at least 7 characters",
+    problem: { status: 422 },
+  });
+});
+
 test("normalizes snake_case history pages and lookup tokens", async () => {
   const fetchMock = vi.fn()
     .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ id: "event-1", pet: { id: "pet-1", name: "Pip", species: "cat", record_number: "HC-1" }, event_type: "adoption", effective_at: "2026-01-02T12:00:00Z", source_shelter: { id: "s-1", name: "Harbor" }, reason_category: "Adoption", factual_note: "Signed handoff", corrects_event_id: null }], next_cursor: "cursor-2" }), { status: 200 }))

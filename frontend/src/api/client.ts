@@ -39,7 +39,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     try {
       const payload = await response.json() as Wire;
       const rawDetail = payload.detail;
-      const detail = typeof rawDetail === "string" ? rawDetail : Array.isArray(rawDetail) ? rawDetail.map((item) => { const issue = item as Wire; const location = Array.isArray(issue.loc) ? issue.loc.slice(1).join(" → ") : "Field"; return `${location}: ${textValue(issue.msg, "is invalid")}`; }).join("; ") : fallback.detail;
+      const validationErrors = Array.isArray(payload.errors) ? payload.errors.map((item) => { const issue = item as Wire; const rawLocation = textValue(issue.location, "Field"); const location = rawLocation.replace(/^(body|query|path)\./, "").replaceAll("_", " "); return `${location}: ${textValue(issue.message, "is invalid")}`; }).join("; ") : "";
+      const detail = validationErrors || (typeof rawDetail === "string" ? rawDetail : Array.isArray(rawDetail) ? rawDetail.map((item) => { const issue = item as Wire; const location = Array.isArray(issue.loc) ? issue.loc.slice(1).join(" → ") : "Field"; return `${location}: ${textValue(issue.msg, "is invalid")}`; }).join("; ") : fallback.detail);
       problem = { ...fallback, ...payload, detail, title: textValue(payload.title, fallback.title), status: response.status } as ApiProblem;
     } catch { /* preserve safe fallback */ }
     throw new ApiError(problem);

@@ -58,5 +58,7 @@ export interface ApiProblem {
   status: number;
   detail: string;
   requestId?: string;
-  errors?: Record<string, string[]>;
+  errors?:
+    | Record<string, string[]>
+    | Array<{ location: string; code: string; message: string }>;
 }
