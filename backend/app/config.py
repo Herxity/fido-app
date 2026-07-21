@@ -18,11 +18,12 @@ class Settings(BaseSettings):
     clerk_authorized_parties: list[str] = Field(default_factory=list)
     clerk_allow_legacy_org_claims: bool = False
     clerk_webhook_secret: str = ""
-    persona_api_base: str = "https://api.withpersona.com/api/v1"
-    persona_version: str = "2025-10-27"
-    persona_api_key: str = ""
-    persona_template_id: str = ""
-    persona_webhook_secret: str = ""
+    stripe_secret_key: str = ""
+    stripe_identity_restricted_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_verification_flow_id: str = ""
+    stripe_require_id_number: bool = False
+    identity_hash_key: str = ""
     field_encryption_key: str = ""
     lookup_hash_key: str = ""
     webhook_tolerance_seconds: int = 300
@@ -36,6 +37,16 @@ class Settings(BaseSettings):
             raise ValueError("provider mode must match the explicit non-production environment")
         if self.environment == "production" and not self.clerk_authorized_parties:
             raise ValueError("production requires an explicit Clerk authorized-party allowlist")
+        if self.environment == "production" and not all(
+            (
+                self.stripe_secret_key,
+                self.stripe_identity_restricted_key,
+                self.stripe_webhook_secret,
+            )
+        ):
+            raise ValueError("production requires Stripe Identity and webhook credentials")
+        if self.environment == "production" and len(self.identity_hash_key) < 32:
+            raise ValueError("production requires a 32-character identity hash key")
         return self
 
 

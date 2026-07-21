@@ -7,7 +7,7 @@ This is an implementation checklist for qualified counsel and the product owner,
 - FCRA and analogous consumer-reporting applicability, permissible purpose, adverse-action obligations, dispute timelines, and marketing language.
 - Data retention for identity, custody, QR access, disputes, audit logs, backups, and provider records.
 - Shelter participation agreement: permitted use, factual accuracy, staff access, disputes, misuse, breach response, and termination.
-- Clerk, Persona, AWS, and GitHub data-processing/security terms and subprocessor disclosures.
+- Clerk, Stripe Identity, AWS, and GitHub data-processing/security terms and subprocessor disclosures.
 - Incident response, law-enforcement requests, owner appeals, accessibility, records preservation, and insurance.
 - Explicit prohibition on automated suitability scoring, protected-trait inference, and use outside owner-authorized adoption workflows.
 

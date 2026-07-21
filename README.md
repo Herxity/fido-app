@@ -4,15 +4,15 @@ Fido is a privacy-conscious, cross-shelter record of factual pet custody events.
 
 ## Repository
 
-- `backend/` — FastAPI, SQLAlchemy, Alembic, Clerk and Persona integrations.
-- `frontend/` — React 19, TypeScript, Vite, Clerk, and Persona Embedded Flow.
+- `backend/` — FastAPI, SQLAlchemy, Alembic, Clerk, and Stripe Identity integrations.
+- `frontend/` — React 19, TypeScript, Vite, Clerk, and Stripe Identity verification.
 - `infra/` — AWS CDK stacks for Lightsail PostgreSQL, compute, CloudFront, WAF, backups, and alarms.
 - `deploy/` — hardened host, database-role, Caddy, and digest-pinned release tooling.
 - `docs/` — architecture decisions, threat model, operations, privacy/legal gates, and contribution rules.
 - `evidence/` — generated checklist and verification evidence.
 
-The approved architecture and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Local setup is documented in [CONTRIBUTING.md](CONTRIBUTING.md), while production operations are in [deploy/README.md](deploy/README.md).
+The approved architecture and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md); the current identity-provider design is in [docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md](docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md). Local setup is documented in [CONTRIBUTING.md](CONTRIBUTING.md), while production operations are in [deploy/README.md](deploy/README.md).
 
 ## Safety status
 
-The software is suitable for sandbox/staging verification. Real owner or shelter data must not be loaded until Clerk and Persona production tenants are configured, counsel completes the reviews listed in `docs/LEGAL_AND_PRIVACY_GATES.md`, and the user separately approves production deployment and DNS cutover.
+The software is suitable for sandbox/staging verification. Real owner or shelter data must not be loaded until Clerk and Stripe production tenants are configured, counsel completes the reviews listed in `docs/LEGAL_AND_PRIVACY_GATES.md`, and the user separately approves production deployment and DNS cutover.

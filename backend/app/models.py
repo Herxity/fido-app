@@ -113,7 +113,6 @@ class UserAccount(Base):
     person_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("people.id", ondelete="RESTRICT")
     )
-    persona_account_id: Mapped[str | None] = mapped_column(String(200), index=True)
     status: Mapped[LinkStatus] = mapped_column(Enum(LinkStatus), default=LinkStatus.pending)
     link_reason: Mapped[str | None] = mapped_column(String(100))
     linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -198,16 +197,38 @@ class IdentityInquiry(Base):
         ForeignKey("people.id", ondelete="RESTRICT")
     )
     reference_id: Mapped[uuid.UUID] = mapped_column(Uuid, unique=True, default=uuid.uuid4)
-    persona_inquiry_id: Mapped[str] = mapped_column(String(200), unique=True)
-    persona_account_id: Mapped[str | None] = mapped_column(String(200), index=True)
+    provider: Mapped[str] = mapped_column(String(30), default="stripe")
+    provider_session_id: Mapped[str] = mapped_column(String(200), unique=True)
+    provider_report_id: Mapped[str | None] = mapped_column(String(200))
     state: Mapped[InquiryState] = mapped_column(Enum(InquiryState), default=InquiryState.pending)
     repeat_outcome: Mapped[str | None] = mapped_column(String(80))
-    workflow_reference: Mapped[str | None] = mapped_column(String(200))
-    case_reference: Mapped[str | None] = mapped_column(String(200))
     reason_category: Mapped[str | None] = mapped_column(String(100))
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class IdentitySignal(Base):
+    __tablename__ = "identity_signals"
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    identity_inquiry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("identity_inquiries.id", ondelete="RESTRICT"), index=True
+    )
+    person_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("people.id", ondelete="RESTRICT"), index=True
+    )
+    signal_type: Mapped[str] = mapped_column(String(50))
+    value_hash: Mapped[str] = mapped_column(String(64))
+    assurance: Mapped[str] = mapped_column(String(20))
+    key_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+    __table_args__ = (
+        Index("ix_identity_signal_match", "signal_type", "value_hash"),
+        UniqueConstraint(
+            "identity_inquiry_id", "signal_type", name="uq_identity_signal_inquiry_type"
+        ),
+    )
 
 
 class LookupToken(Base):

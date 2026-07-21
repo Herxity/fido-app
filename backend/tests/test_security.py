@@ -25,6 +25,15 @@ def test_production_rejects_fake_provider() -> None:
         )
 
 
+def test_production_requires_stripe_identity_secrets() -> None:
+    with pytest.raises(ValueError, match="Stripe Identity"):
+        Settings(
+            environment="production",
+            provider_mode="live",
+            clerk_authorized_parties=["https://x"],
+        )
+
+
 def test_clerk_v2_claims_and_pending_session() -> None:
     principal = principal_from_claims(
         {"sub": "u1", "o": {"id": "org1", "rol": "org:shelter_staff", "per": "x"}}
@@ -75,7 +84,7 @@ async def test_clerk_default_session_token_does_not_require_custom_audience(
     assert "aud" not in captured["options"]["require"]
 
 
-def test_persona_rotated_signature_and_staleness() -> None:
+def test_generic_signed_payload_rotation_and_staleness() -> None:
     raw, secret, timestamp = b'{"safe":true}', "secret", str(int(time.time()))
     signature = hmac.new(
         secret.encode(), timestamp.encode() + b"." + raw, hashlib.sha256

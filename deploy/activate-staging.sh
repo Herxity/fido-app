@@ -18,7 +18,7 @@ secret_dir=/root/fido-bootstrap
 
 [[ ${release_id} =~ ^[a-f0-9]{40}$ ]] || exit 2
 [[ ${image_tag} =~ ^fido-backend:[a-f0-9]{7}$ ]] || exit 2
-for name in db-master db-migrator db-runtime lookup-key field-key origin-token clerk-webhook persona-webhook placeholder-provider; do
+for name in db-master db-migrator db-runtime lookup-key field-key identity-hash-key origin-token clerk-webhook stripe-secret stripe-restricted stripe-webhook; do
   [[ -s ${stage_dir}/fido-${name} ]] || { echo "Missing staged secret: ${name}" >&2; exit 1; }
 done
 
@@ -67,11 +67,12 @@ FIDO_CLERK_JWKS_URL=https://unconfigured.invalid/.well-known/jwks.json
 FIDO_CLERK_AUTHORIZED_PARTIES=["${edge_url}"]
 FIDO_CLERK_ALLOW_LEGACY_ORG_CLAIMS=false
 FIDO_CLERK_WEBHOOK_SECRET=$(<"${secret_dir}/fido-clerk-webhook")
-FIDO_PERSONA_API_BASE=https://api.withpersona.com/api/v1
-FIDO_PERSONA_VERSION=2025-10-27
-FIDO_PERSONA_API_KEY=$(<"${secret_dir}/fido-placeholder-provider")
-FIDO_PERSONA_TEMPLATE_ID=itmpl_staging_not_configured
-FIDO_PERSONA_WEBHOOK_SECRET=$(<"${secret_dir}/fido-persona-webhook")
+FIDO_STRIPE_SECRET_KEY=$(<"${secret_dir}/fido-stripe-secret")
+FIDO_STRIPE_IDENTITY_RESTRICTED_KEY=$(<"${secret_dir}/fido-stripe-restricted")
+FIDO_STRIPE_WEBHOOK_SECRET=$(<"${secret_dir}/fido-stripe-webhook")
+FIDO_STRIPE_VERIFICATION_FLOW_ID=
+FIDO_STRIPE_REQUIRE_ID_NUMBER=false
+FIDO_IDENTITY_HASH_KEY=$(<"${secret_dir}/fido-identity-hash-key")
 FIDO_FIELD_ENCRYPTION_KEY=$(<"${secret_dir}/fido-field-key")
 FIDO_LOOKUP_HASH_KEY=$(<"${secret_dir}/fido-lookup-key")
 FIDO_WEBHOOK_TOLERANCE_SECONDS=300

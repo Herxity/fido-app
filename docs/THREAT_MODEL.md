@@ -2,13 +2,13 @@
 
 ## Assets and boundaries
 
-Protected assets are canonical identity links, custody history, disputes, audit records, QR lookup capability, provider secrets, database credentials, and deployment access. Trust boundaries exist at the browser, CloudFront/WAF, Caddy origin, FastAPI, Clerk and Persona webhooks/APIs, PostgreSQL, GitHub Actions, and SSH.
+Protected assets are canonical identity links, custody history, disputes, audit records, QR lookup capability, provider secrets, database credentials, and deployment access. Trust boundaries exist at the browser, CloudFront/WAF, Caddy origin, FastAPI, Clerk and Stripe Identity webhooks/APIs, PostgreSQL, GitHub Actions, and SSH.
 
 ## Principal threats and controls
 
 | Threat | Primary controls | Verification |
 |---|---|---|
-| Fresh account or alternate ID hides history | Canonical person model, Persona Repeat/Workflow/Case signals, consolidation, manual review | Identity and provider tests |
+| Fresh account or alternate ID hides history | Canonical person model, Stripe document/selfie verification, versioned HMAC signals, alternate-document review, consolidation | Identity and provider tests |
 | Cross-shelter IDOR | Clerk organization/role enforcement, server-derived shelter, shelter-bound lookup session | Tenant-boundary tests |
 | QR theft or replay | Opaque hashed token, five-minute TTL, atomic single use, 30-minute bound session | Concurrent redemption tests |
 | History tampering | Append-only API, correction linkage, runtime-role trigger, audit records | API and PostgreSQL trigger tests |
@@ -21,4 +21,4 @@ Protected assets are canonical identity links, custody history, disputes, audit 
 
 ## Residual risks
 
-Persona configuration quality, reviewer mistakes, shelter misuse, single-node availability, and legal obligations cannot be solved solely in code. Production requires provider sandbox evidence, staff procedures, incident response, access reviews, restore exercises, and legal/privacy sign-off.
+Stripe configuration quality, reviewer mistakes, shelter misuse, single-node availability, and legal obligations cannot be solved solely in code. Production requires provider sandbox evidence, staff procedures, incident response, access reviews, restore exercises, and legal/privacy sign-off.

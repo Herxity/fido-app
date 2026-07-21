@@ -1602,16 +1602,16 @@
         "summary": "Clerk Webhook"
       }
     },
-    "/api/v1/webhooks/persona": {
+    "/api/v1/webhooks/stripe": {
       "post": {
-        "operationId": "persona_webhook_api_v1_webhooks_persona_post",
+        "operationId": "stripe_identity_webhook_api_v1_webhooks_stripe_post",
         "responses": {
           "202": {
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Persona Webhook Api V1 Webhooks Persona Post",
+                  "title": "Response Stripe Identity Webhook Api V1 Webhooks Stripe Post",
                   "type": "object"
                 }
               }
@@ -1619,7 +1619,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Persona Webhook"
+        "summary": "Stripe Identity Webhook"
       }
     }
   }

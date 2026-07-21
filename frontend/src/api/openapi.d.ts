@@ -363,7 +363,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/webhooks/persona": {
+    "/api/v1/webhooks/stripe": {
         parameters: {
             query?: never;
             header?: never;
@@ -372,8 +372,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Persona Webhook */
-        post: operations["persona_webhook_api_v1_webhooks_persona_post"];
+        /** Stripe Identity Webhook */
+        post: operations["stripe_identity_webhook_api_v1_webhooks_stripe_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1263,7 +1263,7 @@ export interface operations {
             };
         };
     };
-    persona_webhook_api_v1_webhooks_persona_post: {
+    stripe_identity_webhook_api_v1_webhooks_stripe_post: {
         parameters: {
             query?: never;
             header?: never;

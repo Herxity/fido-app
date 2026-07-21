@@ -3,28 +3,31 @@
 }
 
 {$ORIGIN_HOSTNAME} {
-	@untrusted not header X-Fido-Origin-Verify {$FIDO_ORIGIN_VERIFY_TOKEN}
-	respond @untrusted "Forbidden" 403
+	@trusted header X-Fido-Origin-Verify {$FIDO_ORIGIN_VERIFY_TOKEN}
 
 	encode zstd gzip
 
-	handle /api/* {
-		reverse_proxy backend:8000
+	handle @trusted {
+		handle /api/* {
+			reverse_proxy backend:8000
+		}
+
+		handle {
+			root * /srv
+			try_files {path} /index.html
+			file_server
+		}
 	}
 
-	handle {
-		root * /srv
-		try_files {path} /index.html
-		file_server
-	}
+	respond "Forbidden" 403
 
 	header {
 		-Server
-		Content-Security-Policy "default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://cdn.withpersona.com https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.withpersona.com; img-src 'self' data: https://img.clerk.com https://*.withpersona.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; frame-src 'self' https://inquiry.withpersona.com https://*.withpersona.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://js.stripe.com https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://api.stripe.com https://r.stripe.com https://m.stripe.network; img-src 'self' data: https://img.clerk.com https://*.stripe.com; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
-		Permissions-Policy "camera=(self \"https://inquiry.withpersona.com\"), microphone=(), geolocation=()"
+		Permissions-Policy "camera=(self \"https://js.stripe.com\"), microphone=(), geolocation=()"
 	}
 
 	log {

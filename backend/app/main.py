@@ -5,12 +5,12 @@ import uuid
 from collections import defaultdict, deque
 from typing import Any
 
-import httpx
+import stripe
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pythonjsonlogger.json import JsonFormatter
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,6 +22,7 @@ from .models import (
     Dispute,
     DisputeStatus,
     IdentityInquiry,
+    IdentitySignal,
     InquiryState,
     LinkStatus,
     LookupToken,
@@ -34,21 +35,20 @@ from .models import (
     WebhookState,
     now,
 )
-from .providers import persona_provider
+from .providers import identity_provider
 from .schemas import (
     CorrectionCreate,
     CustodyCreate,
     DisputeCreate,
     DisputePatch,
     LookupRedeem,
-    PersonaInquiryResult,
     PetCreate,
     PetPatch,
     ReviewResolve,
     decode_cursor,
     encode_cursor,
 )
-from .security import Principal, require_roles, verify_clerk_webhook, verify_persona_webhook
+from .security import Principal, require_roles, verify_clerk_webhook, verify_stripe_webhook
 from .services import (
     audit,
     canonical_person,
@@ -57,7 +57,7 @@ from .services import (
     get_account,
     insert_custody_idempotently,
     merge_people,
-    process_persona_result,
+    process_stripe_result,
     redeem_lookup_token,
     shelter_for_principal,
     valid_lookup_session,
@@ -294,18 +294,33 @@ async def create_inquiry(
         .order_by(IdentityInquiry.created_at.desc())
     )
     if pending:
-        return {"id": pending.id, "inquiry_id": pending.persona_inquiry_id, "status": pending.state}
+        try:
+            resumed = await identity_provider(config).resume_session(pending.provider_session_id)
+        except (stripe.StripeError, RuntimeError) as exc:
+            logger.warning(
+                "stripe_identity.unavailable", extra={"request_id": request.state.request_id}
+            )
+            raise HTTPException(503, "Identity provider temporarily unavailable") from exc
+        return {
+            "id": pending.id,
+            "verification_session_id": pending.provider_session_id,
+            "client_secret": resumed.get("client_secret"),
+            "status": resumed.get("status", pending.state),
+        }
     reference = uuid.uuid4()
     try:
-        result = await persona_provider(config).create_inquiry(reference)
-    except httpx.HTTPError as exc:
-        logger.warning("persona.unavailable", extra={"request_id": request.state.request_id})
+        result = await identity_provider(config).create_session(reference)
+    except (stripe.StripeError, RuntimeError) as exc:
+        logger.warning(
+            "stripe_identity.unavailable", extra={"request_id": request.state.request_id}
+        )
         raise HTTPException(503, "Identity provider temporarily unavailable") from exc
     inquiry = IdentityInquiry(
         user_account_id=account.id,
         person_id=account.person_id,
         reference_id=reference,
-        persona_inquiry_id=result["id"],
+        provider="stripe",
+        provider_session_id=result["id"],
     )
     session.add(inquiry)
     await session.flush()
@@ -320,8 +335,8 @@ async def create_inquiry(
     await session.commit()
     return {
         "id": inquiry.id,
-        "inquiry_id": inquiry.persona_inquiry_id,
-        "session_token": result.get("session_token"),
+        "verification_session_id": inquiry.provider_session_id,
+        "client_secret": result.get("client_secret"),
         "status": inquiry.state,
     }
 
@@ -863,6 +878,12 @@ async def resolve_review(
         account.status = LinkStatus.pending
     else:
         inquiry.reason_category = "more_information_requested"
+    if inquiry.person_id is not None:
+        await session.execute(
+            update(IdentitySignal)
+            .where(IdentitySignal.identity_inquiry_id == inquiry.id)
+            .values(person_id=inquiry.person_id)
+        )
     await audit(
         session,
         principal,
@@ -909,82 +930,54 @@ async def persist_webhook(
     return row, False
 
 
-def _persona_field_value(fields: dict[str, Any], key: str) -> str | None:
-    field = fields.get(key)
-    if not isinstance(field, dict):
-        return None
-    value = field.get("value")
-    return str(value).strip() if value else None
-
-
-def persona_inquiry_result(event_type: str, event_data: dict[str, Any]) -> PersonaInquiryResult:
-    attributes = event_data.get("attributes", {})
-    payload = attributes.get("payload", {})
-    inquiry = payload.get("data", {}) if isinstance(payload, dict) else {}
-    inquiry_attributes = inquiry.get("attributes", {})
-    relationships = inquiry.get("relationships", {})
-    account_data = relationships.get("account", {}).get("data")
-    account_id = account_data.get("id") if isinstance(account_data, dict) else None
-    fields = inquiry_attributes.get("fields", {})
-    name_parts = [
-        _persona_field_value(fields, key) for key in ("name-first", "name-middle", "name-last")
-    ]
-    display_name = " ".join(part for part in name_parts if part) or None
-    states = {
-        "inquiry.approved": InquiryState.approved,
-        "inquiry.declined": InquiryState.declined,
-        "inquiry.marked-for-review": InquiryState.needs_review,
-    }
-    return PersonaInquiryResult(
-        inquiry_id=str(inquiry.get("id", "")),
-        state=states[event_type],
-        account_id=str(account_id) if account_id else None,
-        reference_id=inquiry_attributes.get("reference-id"),
-        display_name=display_name,
-        repeat_outcome=inquiry_attributes.get("repeat-outcome"),
-        matched_person_id=inquiry_attributes.get("matched-person-id"),
-        workflow_reference=inquiry_attributes.get("workflow-id"),
-        case_reference=inquiry_attributes.get("case-id"),
-        reason_category=inquiry_attributes.get("reason-category"),
-    )
-
-
-@app.post("/api/v1/webhooks/persona", status_code=202)
-async def persona_webhook(
+@app.post("/api/v1/webhooks/stripe", status_code=202)
+async def stripe_identity_webhook(
     request: Request,
     session: AsyncSession = Depends(get_session),
     config: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
     raw = await request.body()
-    signature = request.headers.get("persona-signature", "")
-    verify_persona_webhook(
+    signature = request.headers.get("stripe-signature", "")
+    payload = verify_stripe_webhook(
         raw,
         signature,
-        config.persona_webhook_secret,
+        config.stripe_webhook_secret,
         config.webhook_tolerance_seconds,
     )
-    payload = json.loads(raw)
-    event_data = payload.get("data", {})
-    event_attributes = event_data.get("attributes", {})
-    event_id = str(event_data.get("id", ""))
-    event_type = str(event_attributes.get("name", ""))
+    event_id = str(payload.get("id", ""))
+    event_type = str(payload.get("type", ""))
+    event_object = payload.get("data", {}).get("object", {})
+    provider_session_id = str(event_object.get("id", ""))
     if not event_id or not event_type:
         raise HTTPException(422, "Invalid webhook envelope")
-    event, duplicate = await persist_webhook(session, "persona", event_id, event_type)
+    event, duplicate = await persist_webhook(session, "stripe", event_id, event_type)
     if duplicate:
         return {"accepted": True, "duplicate": True}
     try:
         if event_type in {
-            "inquiry.approved",
-            "inquiry.declined",
-            "inquiry.marked-for-review",
+            "identity.verification_session.processing",
+            "identity.verification_session.verified",
+            "identity.verification_session.requires_input",
+            "identity.verification_session.canceled",
         }:
-            await process_persona_result(session, persona_inquiry_result(event_type, event_data))
+            if not provider_session_id:
+                raise HTTPException(422, "Verification session is missing")
+            result = await identity_provider(config).retrieve_result(provider_session_id)
+            inquiry = await session.scalar(
+                select(IdentityInquiry).where(
+                    IdentityInquiry.provider_session_id == provider_session_id
+                )
+            )
+            if inquiry is None or (
+                result.reference_id and result.reference_id != str(inquiry.reference_id)
+            ):
+                raise HTTPException(422, "Verification session binding is invalid")
+            await process_stripe_result(session, result, config.identity_hash_key)
         event.state, event.processed_at = WebhookState.processed, now()
         await audit(
             session,
             None,
-            "webhook.persona.process",
+            "webhook.stripe_identity.process",
             "webhook_event",
             str(event.id),
             request_id=request.state.request_id,

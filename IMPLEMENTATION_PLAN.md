@@ -1,5 +1,7 @@
 # Fido Cross-Shelter Adoption History System
 
+> **Identity-provider update:** The original approved plan below records the initial Persona decision. The current implementation replaces Persona with Stripe Identity and the privacy-preserving matching design in [docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md](docs/STRIPE_IDENTITY_AND_FRAUD_PLAN.md). That document supersedes the identity-provider-specific portions of this plan; the remaining product, privacy, and infrastructure requirements still apply.
+
 ## Summary
 
 Fido will be a U.S.-only pilot that lets participating shelters maintain a factual, cross-shelter history of pet adoptions, returns, surrenders, reclaims, fosters, and transfers. Verified owners can view and dispute their own history and generate a short-lived QR code to authorize a shelter to retrieve it.

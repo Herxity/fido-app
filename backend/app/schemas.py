@@ -107,17 +107,17 @@ class WebhookEnvelope(BaseModel):
     data: dict[str, Any]
 
 
-class PersonaInquiryResult(BaseModel):
-    inquiry_id: str
+class StripeVerificationResult(BaseModel):
+    session_id: str
     state: InquiryState
-    account_id: str | None = None
     reference_id: str | None = None
     display_name: str | None = Field(None, max_length=200)
-    repeat_outcome: (
-        Literal["clear", "strong_match", "ambiguous", "portrait_conflict", "details_conflict"]
-        | None
-    ) = None
-    matched_person_id: uuid.UUID | None = None
-    workflow_reference: str | None = None
-    case_reference: str | None = None
+    report_id: str | None = None
+    document_number: str | None = None
+    document_type: str | None = None
+    issuing_country: str | None = None
+    dob: str | None = None
+    address: dict[str, Any] | None = None
+    phone: str | None = None
+    id_number_last4: str | None = None
     reason_category: str | None = None

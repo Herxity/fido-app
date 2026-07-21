@@ -6,14 +6,16 @@ from typing import Any, cast
 
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .fraud import derive_identity_signals
 from .models import (
     AuditLog,
     CustodyEvent,
     IdentityInquiry,
+    IdentitySignal,
     InquiryState,
     LinkStatus,
     LookupToken,
@@ -23,7 +25,7 @@ from .models import (
     UserAccount,
     now,
 )
-from .schemas import PersonaInquiryResult
+from .schemas import StripeVerificationResult
 from .security import Principal, keyed_hash, opaque_token
 
 
@@ -75,10 +77,12 @@ async def canonical_person(session: AsyncSession, person_id: uuid.UUID) -> Perso
     return person
 
 
-async def process_persona_result(session: AsyncSession, result: PersonaInquiryResult) -> None:
+async def process_stripe_result(
+    session: AsyncSession, result: StripeVerificationResult, identity_hash_key: str
+) -> None:
     inquiry = await session.scalar(
         select(IdentityInquiry)
-        .where(IdentityInquiry.persona_inquiry_id == result.inquiry_id)
+        .where(IdentityInquiry.provider_session_id == result.session_id)
         .with_for_update()
     )
     if inquiry is None:
@@ -89,57 +93,85 @@ async def process_persona_result(session: AsyncSession, result: PersonaInquiryRe
     if account is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Account linkage is unavailable")
     inquiry.received_at = now()
-    inquiry.persona_account_id = result.account_id
-    inquiry.repeat_outcome = result.repeat_outcome
-    inquiry.workflow_reference = result.workflow_reference
-    inquiry.case_reference = result.case_reference
+    inquiry.provider_report_id = result.report_id
     inquiry.reason_category = result.reason_category
-    account.persona_account_id = result.account_id
-    # Strong provider evidence may recover the already-known canonical identity.
-    if result.state == InquiryState.approved and result.repeat_outcome in {None, "clear"}:
-        if account.person_id is None:
-            person = Person(
-                status=PersonStatus.active,
-                verified_display_name=result.display_name,
-                verified_at=now(),
-            )
-            session.add(person)
-            await session.flush()
-            account.person_id = person.id
-        else:
-            person = await canonical_person(session, account.person_id)
-            person.status = PersonStatus.active
-            person.verified_at = now()
-            if result.display_name:
-                person.verified_display_name = result.display_name
-        account.status = LinkStatus.active
-        account.link_reason = "persona_workflow_approved"
-        account.linked_at = now()
-        inquiry.person_id = person.id
-        inquiry.state = InquiryState.approved
-        inquiry.resolved_at = now()
-    elif (
-        result.state == InquiryState.approved
-        and result.repeat_outcome == "strong_match"
-        and result.matched_person_id is not None
-    ):
-        target = await canonical_person(session, result.matched_person_id)
-        account.person_id = target.id
-        account.status = LinkStatus.recovery
-        account.link_reason = "persona_strong_repeat_match"
-        account.linked_at = now()
-        inquiry.person_id = target.id
-        inquiry.state = InquiryState.needs_review
-    elif result.state == InquiryState.declined:
+    if result.state == InquiryState.pending:
+        inquiry.state = InquiryState.pending
+        return
+    if result.state == InquiryState.declined:
         inquiry.state = InquiryState.declined
         inquiry.resolved_at = now()
         account.status = LinkStatus.pending
-    else:
+        return
+    if result.state != InquiryState.approved:
         inquiry.state = InquiryState.needs_review
-        if account.person_id:
-            person = await canonical_person(session, account.person_id)
-            person.status = PersonStatus.review
         account.status = LinkStatus.recovery
+        return
+
+    signals = derive_identity_signals(result, identity_hash_key)
+    stable_signals = [signal for signal in signals if signal.assurance != "weak"]
+    if not any(signal.signal_type == "document_semantic" for signal in signals):
+        inquiry.state = InquiryState.needs_review
+        inquiry.reason_category = "stable_document_signal_unavailable"
+        account.status = LinkStatus.recovery
+        return
+
+    conditions = [
+        (IdentitySignal.signal_type == signal.signal_type)
+        & (IdentitySignal.value_hash == signal.value_hash)
+        for signal in stable_signals
+    ]
+    matches = (
+        (await session.scalars(select(IdentitySignal).where(or_(*conditions)))).all()
+        if conditions
+        else []
+    )
+    matched_people = {match.person_id for match in matches if match.person_id is not None}
+    if matched_people:
+        inquiry.state = InquiryState.needs_review
+        inquiry.repeat_outcome = "possible_existing_identity"
+        inquiry.reason_category = "duplicate_identity_signal"
+        account.status = LinkStatus.recovery
+        for signal in signals:
+            session.add(
+                IdentitySignal(
+                    identity_inquiry_id=inquiry.id,
+                    signal_type=signal.signal_type,
+                    value_hash=signal.value_hash,
+                    assurance=signal.assurance,
+                )
+            )
+        return
+
+    person = (
+        await canonical_person(session, account.person_id)
+        if account.person_id
+        else Person(status=PersonStatus.active)
+    )
+    if account.person_id is None:
+        session.add(person)
+        await session.flush()
+    person.status = PersonStatus.active
+    person.verified_at = now()
+    if result.display_name:
+        person.verified_display_name = result.display_name
+    account.person_id = person.id
+    account.status = LinkStatus.active
+    account.link_reason = "stripe_identity_verified"
+    account.linked_at = now()
+    inquiry.person_id = person.id
+    inquiry.state = InquiryState.approved
+    inquiry.resolved_at = now()
+    for signal in signals:
+        session.add(
+            IdentitySignal(
+                identity_inquiry_id=inquiry.id,
+                person_id=person.id,
+                signal_type=signal.signal_type,
+                value_hash=signal.value_hash,
+                assurance=signal.assurance,
+            )
+        )
 
 
 async def merge_people(

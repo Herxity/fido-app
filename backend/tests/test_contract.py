@@ -55,81 +55,58 @@ def test_openapi_contains_all_public_paths() -> None:
     assert "/api/v1/me" in schema["paths"]
 
 
-@pytest.mark.asyncio
-async def test_persona_endpoint_accepts_matching_second_rotated_signature(client) -> None:  # type: ignore[no-untyped-def]
-    body = json.dumps(
-        {
-            "data": {
-                "id": "evt_rotated_signature",
-                "type": "event",
-                "attributes": {"name": "inquiry.created", "payload": {"data": {}}},
-            }
-        },
-        separators=(",", ":"),
-    ).encode()
+def stripe_signature(body: bytes) -> str:
     timestamp = str(int(time.time()))
     digest = hmac.new(
-        b"persona-test-secret-at-least-32-bytes",
+        b"whsec_stripe-test-secret-at-least-32-bytes",
         timestamp.encode() + b"." + body,
         hashlib.sha256,
     ).hexdigest()
-    response = await client.post(
-        "/api/v1/webhooks/persona",
-        content=body,
-        headers={"Persona-Signature": f"t={timestamp}, v1=obsolete v1={digest}"},
-    )
-
-    assert response.status_code == 202
-    assert response.json() == {"accepted": True, "duplicate": False}
+    return f"t={timestamp},v1={digest}"
 
 
 @pytest.mark.asyncio
-async def test_persona_official_envelope_approves_without_sensitive_fields(client) -> None:  # type: ignore[no-untyped-def]
+async def test_stripe_webhook_is_verified_and_idempotent(client) -> None:  # type: ignore[no-untyped-def]
+    body = json.dumps(
+        {
+            "id": "evt_created",
+            "object": "event",
+            "type": "identity.verification_session.created",
+            "data": {"object": {"id": "vs_created"}},
+        },
+        separators=(",", ":"),
+    ).encode()
+    headers = {"Stripe-Signature": stripe_signature(body)}
+    first = await client.post("/api/v1/webhooks/stripe", content=body, headers=headers)
+    duplicate = await client.post("/api/v1/webhooks/stripe", content=body, headers=headers)
+
+    assert first.status_code == 202
+    assert first.json() == {"accepted": True, "duplicate": False}
+    assert duplicate.json() == {"accepted": True, "duplicate": True}
+
+
+@pytest.mark.asyncio
+async def test_stripe_verified_event_approves_without_storing_sensitive_fields(client) -> None:  # type: ignore[no-untyped-def]
     async with SessionLocal() as session:
-        account = UserAccount(clerk_user_id="persona_contract")
+        account = UserAccount(clerk_user_id="stripe_contract")
         session.add(account)
         await session.flush()
-        session.add(IdentityInquiry(user_account_id=account.id, persona_inquiry_id="inq_official"))
+        session.add(IdentityInquiry(user_account_id=account.id, provider_session_id="vs_official"))
         await session.commit()
 
     body = json.dumps(
         {
-            "data": {
-                "id": "evt_official_approved",
-                "type": "event",
-                "attributes": {
-                    "name": "inquiry.approved",
-                    "payload": {
-                        "data": {
-                            "id": "inq_official",
-                            "type": "inquiry",
-                            "attributes": {
-                                "reference-id": "reference-safe",
-                                "fields": {
-                                    "name-first": {"value": "Maya"},
-                                    "name-last": {"value": "Carter"},
-                                    "birthdate": {"value": "1980-01-01"},
-                                    "address-street-1": {"value": "Sensitive"},
-                                },
-                            },
-                            "relationships": {"account": {"data": {"id": "act_1"}}},
-                        }
-                    },
-                },
-            }
+            "id": "evt_official_verified",
+            "object": "event",
+            "type": "identity.verification_session.verified",
+            "data": {"object": {"id": "vs_official"}},
         },
         separators=(",", ":"),
     ).encode()
-    timestamp = str(int(time.time()))
-    digest = hmac.new(
-        b"persona-test-secret-at-least-32-bytes",
-        timestamp.encode() + b"." + body,
-        hashlib.sha256,
-    ).hexdigest()
     response = await client.post(
-        "/api/v1/webhooks/persona",
+        "/api/v1/webhooks/stripe",
         content=body,
-        headers={"Persona-Signature": f"t={timestamp},v1={digest}"},
+        headers={"Stripe-Signature": stripe_signature(body)},
     )
     assert response.status_code == 202
 
@@ -137,16 +114,16 @@ async def test_persona_official_envelope_approves_without_sensitive_fields(clien
         account = await session.scalar(
             __import__("sqlalchemy")
             .select(UserAccount)
-            .where(UserAccount.clerk_user_id == "persona_contract")
+            .where(UserAccount.clerk_user_id == "stripe_contract")
         )
         assert account and account.status == LinkStatus.active
         inquiry = await session.scalar(
             __import__("sqlalchemy")
             .select(IdentityInquiry)
-            .where(IdentityInquiry.persona_inquiry_id == "inq_official")
+            .where(IdentityInquiry.provider_session_id == "vs_official")
         )
         assert inquiry and inquiry.state == InquiryState.approved
         person = await session.get(
             __import__("app.models", fromlist=["Person"]).Person, account.person_id
         )
-        assert person and person.verified_display_name == "Maya Carter"
+        assert person and person.verified_display_name == "Test Owner"
