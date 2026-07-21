@@ -10,16 +10,18 @@ vi.mock("../../api/client", async (importOriginal) => {
 });
 
 beforeEach(() => {
-  window.sessionStorage.clear();
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
   vi.mocked(api.createLookupToken).mockResolvedValue({ token: "fido:lookup:local-test-pass", expiresAt: new Date(Date.now() + 300_000).toISOString() });
 });
 
-test("saves a generated pass for the local shelter shortcut", async () => {
+test("shows and copies the generated owner pass code", async () => {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   render(<QueryClientProvider client={client}><OwnerPass /></QueryClientProvider>);
 
   fireEvent.click(screen.getByRole("button", { name: "Create shelter pass" }));
 
-  expect(await screen.findByText(/Local test pass saved/)).toBeInTheDocument();
-  await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem("fido:local-owner-pass") || "null")).toMatchObject({ token: "fido:lookup:local-test-pass" }));
+  expect(await screen.findByDisplayValue("fido:lookup:local-test-pass")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
+  await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith("fido:lookup:local-test-pass"));
+  expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
 });

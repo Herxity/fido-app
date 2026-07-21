@@ -15,28 +15,16 @@ const viewer: Viewer = { id: "staff-1", name: "Casey Reviewer", email: "casey@ex
 
 beforeEach(() => {
   vi.clearAllMocks();
-  window.sessionStorage.clear();
   vi.mocked(api.redeemLookup).mockResolvedValue({ id: "lookup-1", personDisplayName: "Maya Owner", expiresAt: new Date(Date.now() + 1_800_000).toISOString(), history: [] });
 });
 
-test("redeems the latest owner pass with one local-testing action", async () => {
-  window.sessionStorage.setItem("fido:local-owner-pass", JSON.stringify({ token: "fido:lookup:local-test-pass", expiresAt: new Date(Date.now() + 300_000).toISOString() }));
+test("redeems a pasted owner pass code", async () => {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/shelter/lookup"]}><Routes><Route element={<Outlet context={{ viewer }} />}><Route path="/shelter/lookup" element={<OwnerLookup />} /></Route></Routes></MemoryRouter></QueryClientProvider>);
 
-  fireEvent.click(screen.getByRole("button", { name: "Use latest local pass" }));
+  fireEvent.change(screen.getByLabelText("Owner pass code"), { target: { value: "fido:lookup:local-test-pass" } });
+  fireEvent.click(screen.getByRole("button", { name: "Open factual history" }));
 
   await waitFor(() => expect(api.redeemLookup).toHaveBeenCalledWith("fido:lookup:local-test-pass"));
   expect(await screen.findByRole("heading", { name: "Maya Owner" })).toBeInTheDocument();
-  expect(window.sessionStorage.getItem("fido:local-owner-pass")).toBeNull();
-});
-
-test("explains how to recover when no local pass exists", async () => {
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/shelter/lookup"]}><Routes><Route element={<Outlet context={{ viewer }} />}><Route path="/shelter/lookup" element={<OwnerLookup />} /></Route></Routes></MemoryRouter></QueryClientProvider>);
-
-  fireEvent.click(screen.getByRole("button", { name: "Use latest local pass" }));
-
-  expect(await screen.findByText(/Generate a new pass in the owner view first/)).toBeInTheDocument();
-  expect(api.redeemLookup).not.toHaveBeenCalled();
 });
